@@ -181,6 +181,15 @@ around 10 and falls again at 20, and abundance halves body size.
 just hands the world to plants. Three seeds is a high noise floor — the next
 pass needs more seeds and the interactions between those three controls.
 
+Second pass ([docs/sweeps/sweep-2.md](docs/sweeps/sweep-2.md)), every
+combination of food 5/7/10/14 × movers-can-produce × food drop, 5 seeds:
+more food means smaller bodies in every combination; the default food 5 sits
+at the edge of viability (3 of 20 worlds went extinct, 0 of 60 at food 7+);
+predators and eyes only appear when food is scarce; and abundance makes every
+world converge, while scarcity with the plant/animal barrier down is where
+worlds take different paths. Candidate setting against "evolving in
+circles": food 7, movers can produce, food drop 5.
+
 ### 3. Metabolic upkeep per cell type
 
 Current economics (`Organism.js`):

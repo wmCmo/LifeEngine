@@ -72,8 +72,11 @@ for (const c of configs) {
 
 // ---------------------------------------------------------------- run
 
-const stamp = new Date().toISOString().replace(/[-:]/g, '').replace('T', '-').slice(0, 13);
-const OUT = path.join(REPO, 'runs', `sweep-${stamp}`);
+// Down to the second, and never reuse a folder: two sweeps started in the
+// same minute used to share one and mix their results.jsonl.
+const stamp = new Date().toISOString().replace(/[-:]/g, '').replace('T', '-').slice(0, 15);
+let OUT = path.join(REPO, 'runs', `sweep-${stamp}`);
+for (let n = 2; fs.existsSync(OUT); n++) OUT = path.join(REPO, 'runs', `sweep-${stamp}-${n}`);
 fs.mkdirSync(OUT, { recursive: true });
 const jsonl = path.join(OUT, 'results.jsonl');
 

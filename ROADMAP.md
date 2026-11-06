@@ -171,6 +171,16 @@ were founded and only 301 are held (2.4%), with 0 broken lineages.
 Gaps: the map is its own page, not yet part of the main app; its history isn't
 saved with a world; the founder portrait ignores eye direction.
 
+### 2c. Parameter sweep — first pass done
+
+`tools/sweep.js`, results in [docs/sweeps/sweep-1.md](docs/sweeps/sweep-1.md).
+Energy (`foodProdProb`) is the master knob: life dies at 2, diversity peaks
+around 10 and falls again at 20, and abundance halves body size.
+`moversCanProduce` and `foodDropProb` change what *kind* of world evolves
+(predator- and eye-dominated, more disagreement between seeds). Taxing movers
+just hands the world to plants. Three seeds is a high noise floor — the next
+pass needs more seeds and the interactions between those three controls.
+
 ### 3. Metabolic upkeep per cell type
 
 Current economics (`Organism.js`):

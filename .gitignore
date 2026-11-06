@@ -7,3 +7,4 @@ dist/js/*.js
 .claude/
 runs/
 prof/
+.deploy/

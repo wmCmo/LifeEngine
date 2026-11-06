@@ -209,5 +209,33 @@ if (top.length) {
     if (cur && guard >= 40) console.log('  ...');
 }
 
+// Eras and extinction events (src/Stats/EraRecord.js).
+const EraRecord = require(path.join(REPO, 'src/Stats/EraRecord'));
+const { eras, events } = EraRecord.summary();
+const GUILD = { plant: 'plant', armed_plant: 'armed plant', grazer: 'grazer', predator: 'predator', unknown: '?' };
+const pct = x => `${Math.round(x * 100)}%`;
+const k = t => t >= 1000 ? `${(t / 1000).toFixed(t % 1000 ? 1 : 0)}k` : `${t}`;
+
+console.log(`\n--- eras (${eras.length}) ---`);
+console.log(`   #  ${'ticks'.padEnd(15)} ${'ruler'.padEnd(11)} ${'guild'.padEnd(11)} ${'plan'.padEnd(16)} peak  ${'ended'.padEnd(9)} mix: plant/armed/graze/pred`);
+for (const e of eras) {
+    const span = `${k(e.start_tick)}-${e.end_tick == null ? 'now' : k(e.end_tick)}`;
+    const planStr = e.plan ? plan({ cell_counts: e.plan }) : '?';
+    const m = e.guild_mix;
+    console.log(`  ${String(e.index).padStart(2)}  ${span.padEnd(15)} ${e.species.padEnd(11)} `
+        + `${GUILD[e.guild].padEnd(11)} ${planStr.padEnd(16)} ${pct(e.peak_share).padStart(4)}  `
+        + `${e.ended_by.padEnd(9)} ${pct(m.plant)}/${pct(m.armed_plant)}/${pct(m.grazer)}/${pct(m.predator)}`);
+}
+
+console.log(`\n--- extinction events (${events.length}) ---`);
+for (const ev of events) {
+    const lost = ev.lost.length
+        ? '  lost: ' + ev.lost.map(l => `${l.name} (${GUILD[l.guild]}, ${l.ever_lived})`).join(', ')
+        : '';
+    console.log(`  ${k(ev.start_tick).padStart(6)}-${k(ev.trough_tick).padEnd(6)} ${ev.type.padEnd(16)} `
+        + `pop ${ev.peak_pop}->${ev.trough_pop} (-${pct(ev.drop)})  `
+        + `lineages lost ${ev.lineages_lost} of ${ev.lineages_lost + ev.lineages_survived} (${pct(ev.lineage_loss)})${lost}`);
+}
+
 // Population trace for parity checks, one line, easy to diff.
 console.log(`\ntrace: ${s.orgs} ${s.cells} ${s.eyes} ${s.movers}`);

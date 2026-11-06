@@ -106,7 +106,35 @@ Then a lineage is a real branch and a tree has structure.
 change actually increased diversity — only eyeballing shapes, which is what
 started this.
 
-### 2. Era and extinction detection, then narration
+### 2. Era and extinction detection, then narration — detection done
+
+`src/Stats/EraRecord.js`, sampled every 100 ticks alongside the fossil record.
+
+- **Era** = one species' reign: it becomes the most populous and holds that
+  for 2,000 ticks. Labelled by the ruler's guild — plant, armed plant, grazer,
+  predator (can it move, does it have a killer cell).
+- **Extinction event** = population falls 40%+ from its recent peak, measured
+  to the trough. **Mass extinction** if half or more of the established
+  lineages (50+ ever lived) alive at the peak died during the fall; otherwise
+  a population crash.
+
+Two corrections the data forced:
+- Diversity (inverse Simpson) can't classify die-offs: it rewards evenness,
+  and when the dominant species collapses hardest it *rises*. The first run
+  showed 67 lineages lost while "diversity" went 4.9 → 6.
+- A change of guild now always founds a new species. Otherwise a predator
+  that drops its one mover cell stays the same species, and an era labelled
+  "predator" was 72% plants.
+
+First result, seeded 42k ticks: the origin plant's age ends in a mass
+extinction at 5.2k–12k — population 3,964 → 690, 29 of 33 established
+lineages lost, mostly grazers and predators — and armed plants (`m2 p1 k1`)
+take over, reaching 72% of all organisms. The world in the original
+complaint didn't drift into being; it came out of an extinction.
+
+Narration (ollama) still to do.
+
+Original reasoning:
 
 Detect numerically, not with a model. A mass extinction is a threshold on a
 time series — a sharp drop in population or in extant-lineage count. "Era of

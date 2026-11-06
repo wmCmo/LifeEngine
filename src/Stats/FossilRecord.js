@@ -2,7 +2,8 @@ const CellStates = require("../Organism/Cell/CellStates");
 const SerializeHelper = require("../Utils/SerializeHelper");
 const Species = require("./Species");
 const Hyperparams = require("../Hyperparameters");
-const { genomeOf, genomeDistance, founderGenome } = require("./Speciation");
+const { genomeOf, genomeDistance, founderGenome, guildOfGenome } = require("./Speciation");
+const EraRecord = require("./EraRecord");
 
 const FossilRecord = {
     init: function(){
@@ -37,8 +38,10 @@ const FossilRecord = {
         const threshold = Hyperparams.speciesThreshold;
         if (threshold >= 0 && parent_species && !parent_species.extinct) {
             const founder = founderGenome(parent_species);
+            const child = founder !== null ? genomeOf(org.anatomy) : null;
             if (founder !== null &&
-                genomeDistance(genomeOf(org.anatomy), founder) <= threshold) {
+                guildOfGenome(child) === guildOfGenome(founder) &&
+                genomeDistance(child, founder) <= threshold) {
                 org.species = parent_species;
                 parent_species.addPop();
                 return parent_species;
@@ -147,6 +150,9 @@ const FossilRecord = {
         this.species_counts.push(this.numExtantSpecies());
         this.av_mut_rates.push(this.env.averageMutability());
         this.calcCellCountAverages();
+        // Eras and extinctions keep their own permanent record; the arrays
+        // here are capped at record_size_limit and lose old history.
+        EraRecord.sample(this.env, this);
         while (this.tick_record.length > this.record_size_limit) {
             this.tick_record.shift();
             this.pop_counts.shift();
@@ -205,6 +211,7 @@ const FossilRecord = {
         this.extant_species = [];
         this.extinct_species = [];
         this.species_created = 0;
+        EraRecord.clear();
         this.setData();
     },
 

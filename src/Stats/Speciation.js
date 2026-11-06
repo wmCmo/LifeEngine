@@ -43,6 +43,23 @@ function genomeDistance(a, b) {
     return diff / Math.max(a.size, b.size, 1);
 }
 
+// Guild = can it move, and does it have a killer cell. Losing locomotion is
+// a single cell but the largest change a body plan can make - a predator that
+// drops its mover cell is now a sessile armed plant. Without this, one
+// species could be mostly plants descended from a predator founder, and an
+// era "ruled by a predator" could be 70% plants. So a change of guild always
+// founds a new species, whatever the distance.
+const MOVER_CODE = CellStates.mover.index * 4;
+const KILLER_CODE = CellStates.killer.index * 4;
+function guildOfGenome(g) {
+    let moves = false, kills = false;
+    for (const code of g.values()) {
+        if (code === MOVER_CODE) moves = true;
+        else if (code === KILLER_CODE) kills = true;
+    }
+    return (moves ? 2 : 0) + (kills ? 1 : 0);
+}
+
 // The founder's genome never changes, so compute it once per species.
 function founderGenome(species) {
     if (species._genome === undefined) {
@@ -51,4 +68,4 @@ function founderGenome(species) {
     return species._genome;
 }
 
-module.exports = { genomeOf, genomeDistance, founderGenome };
+module.exports = { genomeOf, genomeDistance, founderGenome, guildOfGenome };

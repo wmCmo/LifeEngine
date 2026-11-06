@@ -87,6 +87,15 @@ const CellStates = {
     defineLists() {
         this.all = [this.empty, this.food, this.wall, this.mouth, this.producer, this.mover, this.killer, this.armor, this.eye]
         this.living = [this.mouth, this.producer, this.mover, this.killer, this.armor, this.eye];
+        // Stable numeric ids so grid state can be packed into a byte array and
+        // shipped between a worker and the main thread. Must stay 0..15 so the
+        // high nibble is free for the eye's facing direction.
+        for (let i = 0; i < this.all.length; i++) {
+            this.all[i].index = i;
+        }
+    },
+    fromIndex: function(i) {
+        return this.all[i];
     },
     getRandomName: function() {
         return this.all[Math.floor(Math.random() * this.all.length)].name;

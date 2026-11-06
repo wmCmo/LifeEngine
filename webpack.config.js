@@ -2,9 +2,12 @@ const path = require('path');
 const webpack = require("webpack");
 
 module.exports = {
-    entry: './src/index.js',
+    entry: {
+        bundle: './src/index.js',
+        workerbench: './src/worker-bench.js',
+    },
     output: {
-        filename: 'bundle.js',
+        filename: '[name].js',
         path: path.resolve(__dirname, 'dist/js/'),
     },
     plugins: [

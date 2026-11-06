@@ -286,14 +286,16 @@ class ControlPanel {
         $('#save-env').click( () => {
             let was_running = this.engine.running;
             this.setPaused(true);
-            let env = this.engine.env.serialize();
-            let data = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(env));
-            let downloadEl = document.getElementById('download-el');
-            downloadEl.setAttribute("href", data);
-            downloadEl.setAttribute("download", $('#save-env-name').val()+".json");
-            downloadEl.click();
-            if (was_running)
-                this.setPaused(false);
+            // The world lives in the worker, so serializing is a round trip.
+            this.engine.env.serialize((env) => {
+                let data = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(env));
+                let downloadEl = document.getElementById('download-el');
+                downloadEl.setAttribute("href", data);
+                downloadEl.setAttribute("download", $('#save-env-name').val()+".json");
+                downloadEl.click();
+                if (was_running)
+                    this.setPaused(false);
+            });
         });
         $('#load-env').click(() => {
             LoadController.loadJson((env)=>{
@@ -637,6 +639,14 @@ class ControlPanel {
 
     setEditorOrganism(org) {
         this.engine.organism_editor.setOrganismToCopyOf(org);
+        this.editor_controller.clearDetailsPanel();
+        this.editor_controller.setEditorPanel();
+    }
+
+    // Same thing, but starting from the serialized form the worker sends back
+    // when the user clicks an organism in the world.
+    setEditorOrganismRaw(raw) {
+        this.engine.organism_editor.setOrganismFromRaw(raw);
         this.editor_controller.clearDetailsPanel();
         this.editor_controller.setEditorPanel();
     }

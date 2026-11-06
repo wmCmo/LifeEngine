@@ -7,13 +7,22 @@ class KillerCell extends BodyCell{
         super(CellStates.killer, org, loc_col, loc_row);
     }
 
+    // ~8% of runtime; same treatment as MouthCell.performFunction.
     performFunction() {
-        var env = this.org.env;
-        var c = this.getRealCol();
-        var r = this.getRealRow();
-        for (var loc of Hyperparams.killableNeighbors) {
-            var cell = env.grid_map.cellAt(c+loc[0], r+loc[1]);
-            this.killNeighbor(cell);
+        const env = this.org.env;
+        const c = this.getRealCol();
+        const r = this.getRealRow();
+        const gm = env.grid_map;
+        const grid = gm.grid;
+        const cols = gm.cols;
+        const rows = gm.rows;
+        const neighbors = Hyperparams.killableNeighbors;
+        for (let i = 0; i < neighbors.length; i++) {
+            const loc = neighbors[i];
+            const nc = c + loc[0];
+            const nr = r + loc[1];
+            if (nc < 0 || nc >= cols || nr < 0 || nr >= rows) continue;
+            this.killNeighbor(grid[nc][nr]);
         }
     }
 

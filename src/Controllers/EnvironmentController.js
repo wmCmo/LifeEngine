@@ -14,6 +14,22 @@ class EnvironmentController extends CanvasController{
         this.org_to_clone = null;
         this.defineZoomControls();
         this.scale = 1;
+
+        // The owner map is only needed while the pointer is over the board, so
+        // don't make the worker ship it the rest of the time.
+        if (this.env.wantOwners) {
+            canvas.addEventListener('mouseenter', () => this.env.wantOwners(true));
+            canvas.addEventListener('mouseleave', () => this.env.wantOwners(false));
+        }
+    }
+
+    setControlPanel(panel) {
+        super.setControlPanel(panel);
+        // Selecting an organism is a round trip; the worker replies with its
+        // serialized form and we hand that to the editor.
+        this.env.on_organism = (raw) => {
+            if (raw) panel.setEditorOrganismRaw(raw);
+        };
     }
 
     defineZoomControls() {
@@ -57,28 +73,10 @@ class EnvironmentController extends CanvasController{
     /*
     Iterate over grid from 0,0 to env.num_cols,env.num_rows and create random walls using perlin noise to create a more organic shape.
     */
+    // The world lives in the worker now, so wall generation happens there -
+    // doing it here would mean a round trip per square.
     randomizeWalls(thickness=1) {
-        this.env.clearWalls();
-        const noise_threshold = -0.017;
-        let avg_noise = 0;
-        let resolution = 20;
-        Perlin.seed();
-
-        for (let r = 0; r < this.env.num_rows; r++) {
-            for (let c = 0; c < this.env.num_cols; c++) {
-                let xval = c/this.env.num_cols*(resolution/this.env.renderer.cell_size*(this.env.num_cols/this.env.num_rows));
-                let yval = r/this.env.num_rows*(resolution/this.env.renderer.cell_size*(this.env.num_rows/this.env.num_cols));
-                let noise = Perlin.get(xval, yval);
-                avg_noise += noise/(this.env.num_rows*this.env.num_cols);
-                if (noise > noise_threshold && noise < noise_threshold + thickness/resolution) {
-                    let cell = this.env.grid_map.cellAt(c, r);
-                    if (cell != null) {
-                        if(cell.owner != null) cell.owner.die();
-                        this.env.changeCell(c, r, CellStates.wall, null);
-                    }
-                }
-            }
-        }
+        this.env.randomizeWalls(thickness);
     }
 
     updateMouseLocation(offsetX, offsetY){
@@ -132,12 +130,9 @@ class EnvironmentController extends CanvasController{
                     break;
 
                 case Modes.Select:
-                    if (this.cur_org == null) {
-                        this.cur_org = this.findNearOrganism();
-                    }
-                    if (this.cur_org != null){
-                        this.control_panel.setEditorOrganism(this.cur_org);
-                    }
+                    // Answered asynchronously: only the worker holds the real
+                    // organism. See this.env.on_organism, wired in setControlPanel.
+                    this.env.selectAt(cell.col, cell.row, WorldConfig.brush_size);
                     break;
 
                 case Modes.Clone:
@@ -165,74 +160,20 @@ class EnvironmentController extends CanvasController{
         $('#env-canvas').css('left', new_left+'px');
     }
 
+    // `organism` is a live main-thread Organism from the editor. Only its
+    // serialized form crosses into the worker, which rebuilds and places it.
     dropOrganism(organism, col, row) {
-
-        // clone the organism and drop it in the world
-        var new_org = new Organism(col, row, this.env, organism);
-
-        if (new_org.isClear(col, row)) {
-            let new_species = !FossilRecord.speciesIsExtant(new_org.species.name);
-            if (new_org.species.extinct) {
-                FossilRecord.resurrect(new_org.species);
-            }
-            else if (new_species) {
-                FossilRecord.addSpeciesObj(new_org.species);
-                new_org.species.start_tick = this.env.total_ticks;
-                new_org.species.population = 0;
-            }
-
-            this.env.addOrganism(new_org);
-            new_org.species.addPop();
-            return true;
-        }
-        return false;
+        if (organism == null) return false;
+        this.env.dropOrganism(organism.serialize(), col, row);
+        return true;
     }
 
     dropCellType(col, row, state, killBlocking=false, ignoreState=null) {
-        for (var loc of Neighbors.inRange(WorldConfig.brush_size)){
-            var c=col + loc[0];
-            var r=row + loc[1];
-            var cell = this.env.grid_map.cellAt(c, r);
-            if (cell == null)
-                continue;
-            if (killBlocking && cell.owner != null){
-                cell.owner.die();
-            }
-            else if (cell.owner != null) {
-                continue;
-            }
-            if (ignoreState != null && cell.state == ignoreState)
-                continue;
-            this.env.changeCell(c, r, state, null);
-        }
-    }
-
-    findNearOrganism() {
-        let closest = null;
-        let closest_dist = 100;
-        for (let loc of Neighbors.inRange(WorldConfig.brush_size)){
-            let c = this.cur_cell.col + loc[0];
-            let r = this.cur_cell.row + loc[1];
-            let cell = this.env.grid_map.cellAt(c, r);
-            let dist = Math.abs(loc[0]) + Math.abs(loc[1]);
-            if (cell != null && cell.owner != null) { 
-                if (closest === null || dist < closest_dist) {
-                    closest = cell.owner;
-                    closest_dist = dist;
-                }
-            }
-        }
-        return closest;
+        this.env.dropCells(col, row, state, WorldConfig.brush_size, killBlocking, ignoreState);
     }
 
     killNearOrganisms() {
-        for (var loc of Neighbors.inRange(WorldConfig.brush_size)){
-            var c = this.cur_cell.col + loc[0];
-            var r = this.cur_cell.row + loc[1];
-            var cell = this.env.grid_map.cellAt(c, r);
-            if (cell != null && cell.owner != null)
-                cell.owner.die();
-        }
+        this.env.killAt(this.cur_cell.col, this.cur_cell.row, WorldConfig.brush_size);
     }
 
 

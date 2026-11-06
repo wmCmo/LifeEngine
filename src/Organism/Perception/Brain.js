@@ -23,6 +23,9 @@ const Decision = {
 // (action,next_state) = decisions[eye_index][state_index][observed_cell]
 // the nearest eye's observations is the one that determines the action
 
+// Shared "do nothing" decision. Never mutated.
+const NEUTRAL = Object.freeze({ decision: Decision.neutral, state: 0 });
+
 class Brain {
     constructor(owner) {
         this.owner = owner;
@@ -217,10 +220,10 @@ class Brain {
     }
 
     decide() {
-        let decision = {
-            decision: Decision.neutral,
-            state: 0
-        };
+        // NEUTRAL is a shared constant and _out is reused: this used to
+        // allocate two throwaway objects per mover per tick. The caller
+        // destructures the result immediately, so reuse is safe.
+        let decision = NEUTRAL;
         let closest = Hyperparams.lookRange + 1;
         let move_direction = 0;
         for (let i = 0; i < this.observations.length; i++) {
@@ -238,9 +241,12 @@ class Brain {
                 closest = obs.distance;
             }
         }
-        this.observations = [];
+        this.observations.length = 0;   // reuse the array instead of a new one
         this.state = decision.state;
-        return {decision: decision.decision, move_direction};
+        if (this._out === undefined) this._out = {decision: 0, move_direction: 0};
+        this._out.decision = decision.decision;
+        this._out.move_direction = move_direction;
+        return this._out;
     }
 
     size() {
@@ -281,11 +287,21 @@ class Brain {
     }
 }
 
+// Called on every reproduction, and it was 7% of total runtime: the generic
+// version went through Object.entries -> map -> Object.fromEntries, which
+// allocates an array of [key, value] pairs plus a closure per level, per
+// birth. The shape here is fixed and shallow - decisions[eye][state][cell
+// name] = {decision, state} - so copy it directly.
 function deepCopy(obj) {
     if (Array.isArray(obj)) {
-        return obj.map(deepCopy);
-    } else if (typeof obj === 'object' && obj !== null) {
-        return Object.fromEntries(Object.entries(obj).map(([key, value]) => [key, deepCopy(value)]));
+        const out = new Array(obj.length);
+        for (let i = 0; i < obj.length; i++) out[i] = deepCopy(obj[i]);
+        return out;
+    }
+    if (typeof obj === 'object' && obj !== null) {
+        const out = {};
+        for (const key in obj) out[key] = deepCopy(obj[key]);
+        return out;
     }
     return obj;
 }

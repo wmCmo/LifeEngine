@@ -11,14 +11,37 @@ class GridMap {
         this.cols = cols;
         this.rows = rows;
         this.cell_size = cell_size;
+        // Byte-per-square mirror of the grid, kept in sync by setCellType /
+        // setCellOwner. Low nibble = CellStates index, high nibble = facing
+        // direction for eyes. Lets a worker ship the whole board to the
+        // renderer as one transferable buffer. Zero == empty, which is what a
+        // fresh Uint8Array already is.
+        this.view = new Uint8Array(cols * rows);
+        // Parallel map of which organism occupies each square (0 == nobody).
+        // Lets the main thread answer "what am I hovering over" without owning
+        // a single real Organism.
+        this.owners = new Uint32Array(cols * rows);
         for(var c=0; c<cols; c++) {
             var row = [];
             for(var r=0; r<rows; r++) {
                 var cell = new Cell(CellStates.empty, c, r, c*cell_size, r*cell_size);
                 row.push(cell);
-            }            
+            }
             this.grid.push(row);
         }
+    }
+
+    // Recompute the packed byte for one square.
+    refreshView(col, row) {
+        const cell = this.grid[col][row];
+        let packed = cell.state.index;
+        if (cell.state === CellStates.eye && cell.cell_owner != null
+            && typeof cell.cell_owner.getAbsoluteDirection === 'function') {
+            packed |= (cell.cell_owner.getAbsoluteDirection() & 3) << 4;
+        }
+        const i = row * this.cols + col;
+        this.view[i] = packed;
+        this.owners[i] = (cell.owner != null && cell.owner.id) ? cell.owner.id : 0;
     }
 
     fillGrid(state, ignore_walls=false) {
@@ -28,6 +51,9 @@ class GridMap {
                 cell.setType(state);
                 cell.owner = null;
                 cell.cell_owner = null;
+                const i = cell.row * this.cols + cell.col;
+                this.view[i] = state.index;
+                this.owners[i] = 0;
             }
         }
     }
@@ -53,7 +79,7 @@ class GridMap {
         this.grid[col][row].cell_owner = cell_owner;
         if (cell_owner != null)
             this.grid[col][row].owner = cell_owner.org;
-        else 
+        else
             this.grid[col][row].owner = null;
     }
 
@@ -101,10 +127,16 @@ class GridMap {
     }
 
     loadRaw(grid) {
-        for (let f of grid.food)
+        // setCellType no longer refreshes the mirror (changeCell does it once
+        // instead), so these direct writes have to refresh it themselves.
+        for (let f of grid.food) {
             this.setCellType(f.c, f.r, CellStates.food);
-        for (let w of grid.walls)
+            if (this.isValidLoc(f.c, f.r)) this.refreshView(f.c, f.r);
+        }
+        for (let w of grid.walls) {
             this.setCellType(w.c, w.r, CellStates.wall);
+            if (this.isValidLoc(w.c, w.r)) this.refreshView(w.c, w.r);
+        }
     }
 }
 

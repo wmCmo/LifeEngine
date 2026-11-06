@@ -68,6 +68,19 @@ class OrganismEditor extends Environment{
         }
     }
 
+    // Rebuild an organism from the serialized form the simulation worker
+    // sends back, then edit a copy of it exactly as if it had been clicked
+    // in a same-thread world.
+    setOrganismFromRaw(raw) {
+        const tmp = new Organism(0, 0, null);
+        tmp.loadRaw(raw);
+        // Serialization keeps only the species *name*, but the details panel
+        // wants a species object. Rebuild one from the anatomy we just loaded.
+        tmp.species = new Species(tmp.anatomy, null, 0);
+        if (raw.species_name) tmp.species.name = raw.species_name;
+        this.setOrganismToCopyOf(tmp);
+    }
+
     setOrganismToCopyOf(orig_org) {
         this.grid_map.fillGrid(CellStates.empty);
         var center = this.grid_map.getCenter();

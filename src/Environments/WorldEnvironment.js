@@ -1,5 +1,6 @@
 const Environment = require('./Environment');
 const Renderer = require('../Rendering/Renderer');
+const NullRenderer = require('../Rendering/NullRenderer');
 const GridMap = require('../Grid/GridMap');
 const Organism = require('../Organism/Organism');
 const CellStates = require('../Organism/Cell/CellStates');
@@ -11,13 +12,25 @@ const SerializeHelper = require('../Utils/SerializeHelper');
 const Species = require('../Stats/Species');
 
 class WorldEnvironment extends Environment{
-    constructor(engine, cell_size) {
+    // opts.headless: run with no canvas and no input controller, for a Web
+    // Worker or a Node benchmark. opts.cols / opts.rows size the grid in that
+    // case, since there is no canvas to measure.
+    constructor(engine, cell_size, opts = {}) {
         super();
         this.engine = engine;
-        this.renderer = new Renderer('env-canvas', 'env', cell_size);
-        this.controller = new EnvironmentController(this, this.renderer.canvas);
-        this.num_rows = Math.ceil(this.renderer.height / cell_size);
-        this.num_cols = Math.ceil(this.renderer.width / cell_size);
+        this.headless = !!opts.headless;
+        if (this.headless) {
+            this.num_cols = opts.cols || 100;
+            this.num_rows = opts.rows || 100;
+            this.renderer = new NullRenderer(cell_size, this.num_cols, this.num_rows);
+            this.controller = null;
+        }
+        else {
+            this.renderer = new Renderer('env-canvas', 'env', cell_size);
+            this.controller = new EnvironmentController(this, this.renderer.canvas);
+            this.num_rows = Math.ceil(this.renderer.height / cell_size);
+            this.num_cols = Math.ceil(this.renderer.width / cell_size);
+        }
         this.grid_map = new GridMap(this.num_cols, this.num_rows, cell_size);
         this.organisms = [];
         this.walls = [];
@@ -30,14 +43,25 @@ class WorldEnvironment extends Environment{
     }
 
     update() {
-        var to_remove = [];
-        for (var i in this.organisms) {
-            var org = this.organisms[i];
+        // Indexed loop, not `for...in`: for...in enumerates string keys and
+        // blocks V8's fast paths, and this is the outermost loop of the whole
+        // simulation. Newborns are appended during the loop and, as before,
+        // first update on the next tick.
+        const orgs = this.organisms;
+        // Snapshot the length: organisms born this tick are appended and first
+        // update on the NEXT tick, which is what the old `for...in` did.
+        const n = orgs.length;
+        const dead = this._dead_idx || (this._dead_idx = []);
+        dead.length = 0;
+        for (let i = 0; i < n; i++) {
+            const org = orgs[i];
             if (!org.living || !org.update()) {
-                to_remove.push(i);
+                dead.push(i);
             }
         }
-        this.removeOrganisms(to_remove);
+        if (dead.length > 0) {
+            this.removeAtSortedIndices(dead);
+        }
         if (Hyperparams.foodDropProb > 0) {
             this.generateFood();
         }
@@ -60,13 +84,48 @@ class WorldEnvironment extends Environment{
         this.renderer.renderFullGrid(this.grid_map.grid);
     }
 
+    // Remove the organisms at the given ascending indices in one pass. The old
+    // version spliced one index at a time, which shifts the whole tail per
+    // removal - O(deaths * population). At 14k organisms with a normal death
+    // rate that was millions of element moves every tick.
+    //
+    // It removes exactly the indices it is given, not "everything not living":
+    // an organism killed by a later organism in the same tick stays in the
+    // list until the next tick, which is the behaviour this replaces.
+    removeAtSortedIndices(idx) {
+        const orgs = this.organisms;
+        const start_pop = orgs.length;
+        let write = idx[0];
+        let k = 0;
+        for (let i = idx[0]; i < orgs.length; i++) {
+            if (k < idx.length && i === idx[k]) {
+                this.total_mutability -= orgs[i].mutability;
+                k++;
+                continue;
+            }
+            orgs[write++] = orgs[i];
+        }
+        orgs.length = write;
+        this.afterRemoval(start_pop);
+    }
+
     removeOrganisms(org_indeces) {
         let start_pop = this.organisms.length;
         for (var i of org_indeces.reverse()){
             this.total_mutability -= this.organisms[i].mutability;
             this.organisms.splice(i, 1);
         }
+        this.afterRemoval(start_pop);
+    }
+
+    afterRemoval(start_pop) {
         if (this.organisms.length === 0 && start_pop > 0) {
+            if (this.headless) {
+                // no UI to drive; let whoever owns the loop decide
+                if (this.onExtinction) this.onExtinction();
+                else if (WorldConfig.auto_reset) { this.reset_count++; this.reset(false); }
+                return;
+            }
             if (WorldConfig.auto_pause)
                 $('.pause-button')[0].click();
             else if(WorldConfig.auto_reset) {
@@ -87,6 +146,13 @@ class WorldEnvironment extends Environment{
     }
 
     addOrganism(organism) {
+        // Stable per-world id so the owner map can name an organism across the
+        // worker boundary. Not serialized; ids only need to be valid for the
+        // lifetime of this world.
+        if (!organism.id) {
+            this.next_org_id = (this.next_org_id || 0) + 1;
+            organism.id = this.next_org_id;
+        }
         organism.updateGrid();
         this.total_mutability += organism.mutability;
         this.organisms.push(organism);
@@ -109,9 +175,16 @@ class WorldEnvironment extends Environment{
 
     changeCell(c, r, state, owner) {
         super.changeCell(c, r, state, owner);
-        this.renderer.addToRender(this.grid_map.cellAt(c, r));
+        // cellAt returns null off-grid - an organism straddling the edge can
+        // ask to change a square that does not exist. setCellType already
+        // ignores those, but queueing the null for rendering crashes the
+        // renderer later, far from the cause.
+        const cell = this.grid_map.cellAt(c, r);
+        if (cell == null)
+            return;
+        this.renderer.addToRender(cell);
         if(state == CellStates.wall)
-            this.walls.push(this.grid_map.cellAt(c, r));
+            this.walls.push(cell);
     }
 
     clearWalls() {
@@ -242,7 +315,9 @@ class WorldEnvironment extends Environment{
             FossilRecord.addSpeciesObj(species[name]);
         FossilRecord.loadRaw(env.fossil_record);
         SerializeHelper.overwriteNonObjects(env, this);
-        if ($('#override-controls').is(':checked'))
+        // In the worker there is no checkbox to read; the main thread decides
+        // and sends the controls separately.
+        if (!this.headless && $('#override-controls').is(':checked'))
             Hyperparams.loadJsonObj(env.controls)
         this.renderer.renderFullGrid(this.grid_map.grid);
     }

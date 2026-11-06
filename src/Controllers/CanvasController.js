@@ -87,9 +87,15 @@ class CanvasController{
         this.mouse_c = colRow[0];
         this.mouse_r = colRow[1];
         this.cur_cell = this.env.grid_map.cellAt(this.mouse_c, this.mouse_r);
-        this.cur_org = this.cur_cell.owner;
+        this.cur_org = this.cur_cell ? this.cur_cell.owner : null;
 
-        if (this.cur_org != prev_org || this.cur_cell != prev_cell) {
+        // When the world lives in a worker, cellAt returns a fresh handle each
+        // call, so compare identity by organism id and grid position rather
+        // than by object reference.
+        const org_changed = orgKey(this.cur_org) !== orgKey(prev_org);
+        const cell_changed = cellKey(this.cur_cell) !== cellKey(prev_cell);
+
+        if (org_changed || cell_changed) {
             this.env.renderer.clearAllHighlights(true);
             if (this.cur_org != null && this.highlight_org) {
                 this.env.renderer.highlightOrganism(this.cur_org);
@@ -111,6 +117,16 @@ class CanvasController{
     mouseUp(){
         alert("mouse up must be overridden")
     }
+}
+
+function orgKey(org) {
+    if (org == null) return null;
+    return org.id != null ? 'id:' + org.id : org;
+}
+
+function cellKey(cell) {
+    if (cell == null) return null;
+    return cell.col + ',' + cell.row;
 }
 
 module.exports = CanvasController;

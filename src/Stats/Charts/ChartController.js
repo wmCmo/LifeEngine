@@ -27,9 +27,13 @@ class ChartController {
     }
 
     setMinimum() {
+        // `dataPoints != []` is always true - it compares against a fresh
+        // array - so this used to throw whenever the chart rendered before
+        // any data existed. Check the length instead.
         var min = 0;
-        if (this.data[0].dataPoints != [])
-            min = this.data[0].dataPoints[0].x;
+        var series = this.data[0];
+        if (series && series.dataPoints && series.dataPoints.length > 0)
+            min = series.dataPoints[0].x;
         this.chart.options.axisX.minimum = min;
     }
 

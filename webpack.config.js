@@ -6,6 +6,7 @@ module.exports = {
         bundle: './src/index.js',
         workerbench: './src/worker-bench.js',
         multiworld: './src/multiworld.js',
+        evomap: './src/evomap.js',
     },
     output: {
         filename: '[name].js',

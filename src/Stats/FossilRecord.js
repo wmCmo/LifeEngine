@@ -4,6 +4,7 @@ const Species = require("./Species");
 const Hyperparams = require("../Hyperparameters");
 const { genomeOf, genomeDistance, founderGenome, guildOfGenome } = require("./Speciation");
 const EraRecord = require("./EraRecord");
+const PhyloRecord = require("./PhyloRecord");
 
 const FossilRecord = {
     init: function(){
@@ -26,6 +27,7 @@ const FossilRecord = {
         this.extant_species[new_species.name] = new_species;
         org.species = new_species;
         this.species_created = (this.species_created || 0) + 1;
+        PhyloRecord.onFounded(new_species, this.env.total_ticks);
         return new_species;
     },
 
@@ -81,6 +83,7 @@ const FossilRecord = {
         species.end_tick = this.env.total_ticks;
         species.ancestor = undefined; // garbage collect ancestors
         delete this.extant_species[species.name];
+        PhyloRecord.onExtinct(species, this.env.total_ticks);
 
         // Keep a small record so the lineage survives extinction - without
         // it every ancestor link is cut the moment an ancestor dies out, and
@@ -153,6 +156,9 @@ const FossilRecord = {
         // Eras and extinctions keep their own permanent record; the arrays
         // here are capped at record_size_limit and lose old history.
         EraRecord.sample(this.env, this);
+        if (Array.isArray(this.env.organisms)) {      // not on the main-thread stand-in
+            PhyloRecord.sample(this.env.total_ticks, this);
+        }
         while (this.tick_record.length > this.record_size_limit) {
             this.tick_record.shift();
             this.pop_counts.shift();
@@ -212,6 +218,7 @@ const FossilRecord = {
         this.extinct_species = [];
         this.species_created = 0;
         EraRecord.clear();
+        PhyloRecord.clear();
         this.setData();
     },
 

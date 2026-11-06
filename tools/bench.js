@@ -95,6 +95,8 @@ const FossilRecord     = require(path.join(REPO, 'src/Stats/FossilRecord'));
 if (process.env.SPECIES_THRESHOLD !== undefined) {
     Hyperparams.speciesThreshold = parseFloat(process.env.SPECIES_THRESHOLD);
 }
+const PhyloRecord = require(path.join(REPO, 'src/Stats/PhyloRecord'));
+if (process.env.PHYLO) PhyloRecord.enabled = true;
 
 WorldConfig.headless = true;
 WorldConfig.auto_reset = true;
@@ -235,6 +237,34 @@ for (const ev of events) {
     console.log(`  ${k(ev.start_tick).padStart(6)}-${k(ev.trough_tick).padEnd(6)} ${ev.type.padEnd(16)} `
         + `pop ${ev.peak_pop}->${ev.trough_pop} (-${pct(ev.drop)})  `
         + `lineages lost ${ev.lineages_lost} of ${ev.lineages_lost + ev.lineages_survived} (${pct(ev.lineage_loss)})${lost}`);
+}
+
+// Phylogeny integrity (PHYLO=1): every node in the map set must trace back
+// to a root through nodes that are themselves in the map, and pruning must
+// actually be bounding memory.
+if (PhyloRecord.enabled) {
+    const nodes = PhyloRecord.nodes;
+    let in_map = 0, roots = 0, broken = 0, with_series = 0, points = 0;
+    for (const n of nodes.values()) {
+        if (!n.in_map) continue;
+        in_map++;
+        if (n.series.length) with_series++;
+        points += n.series.length;
+        if (!n.ancestor) { roots++; continue; }
+        let cur = n, guard = 0, ok = true;
+        while (cur.ancestor && guard++ < 100000) {
+            const p = nodes.get(cur.ancestor);
+            if (!p || !p.in_map) { ok = false; break; }
+            cur = p;
+        }
+        if (!ok) broken++;
+    }
+    const founded = FossilRecord.species_created || 0;
+    console.log(`\n--- phylogeny ---`);
+    console.log(`species founded     : ${founded}`);
+    console.log(`held in memory      : ${nodes.size}  (${founded ? (nodes.size / founded * 100).toFixed(1) : 0}% of founded)`);
+    console.log(`in the map          : ${in_map}  roots ${roots}  broken lineages ${broken}`);
+    console.log(`series points       : ${points} across ${with_series} species`);
 }
 
 // Population trace for parity checks, one line, easy to diff.

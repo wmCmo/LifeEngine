@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Evolution Map</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #0d1820; color: #c9d4e6;
+    font: 11px/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+  #map { position: fixed; inset: 0; width: 100vw; height: 100vh; display: block; cursor: grab; }
+  #map:active { cursor: grabbing; }
+
+  .panel { position: fixed; background: rgba(9,17,23,0.86); border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 8px; padding: 12px 14px; backdrop-filter: blur(6px); }
+  #top { top: 14px; left: 14px; max-width: 330px; }
+  h1 { margin: 0 0 2px; font-size: 13px; letter-spacing: .14em; color: #fff; font-weight: 700; }
+  .sub { color: #6c7d93; margin-bottom: 10px; }
+  .row { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; align-items: center; }
+  button, select { font: inherit; border-radius: 5px; border: 1px solid #2a3a4c; background: #1a2836;
+    color: #c9d4e6; padding: 5px 10px; cursor: pointer; }
+  button:hover { border-color: #46607a; }
+  button#run { background: #3FE07A; color: #08121a; border-color: #3FE07A; font-weight: 700; min-width: 64px; }
+  button#run.alt { background: #1a2836; color: #c9d4e6; border-color: #2a3a4c; }
+  button.on { background: #e9eef7; color: #0d1820; border-color: #e9eef7; }
+
+  #stats { top: 14px; right: 14px; min-width: 230px; }
+  table { border-collapse: collapse; width: 100%; }
+  td { padding: 1px 0; }
+  td:first-child { color: #6c7d93; padding-right: 12px; }
+  td:last-child { text-align: right; color: #e9eef7; font-variant-numeric: tabular-nums; }
+  i { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; }
+  #legend { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-top: 10px; color: #8a9bb2; }
+
+  #inset { bottom: 40px; left: 14px; padding: 8px; }
+  #board { display: block; width: 240px; height: auto; image-rendering: pixelated; border-radius: 4px; background: #0E1318; }
+  .cap { color: #6c7d93; margin-top: 5px; display: flex; justify-content: space-between; }
+
+  #help { bottom: 40px; right: 14px; color: #6c7d93; max-width: 280px; cursor: pointer; }
+  #help b { color: #c9d4e6; font-weight: 600; }
+  #help .x { float: right; color: #46607a; margin-left: 8px; }
+  #help-btn { position: fixed; bottom: 40px; right: 14px; display: none; }
+
+  #tooltip { position: fixed; display: none; pointer-events: none; z-index: 10;
+    background: rgba(7,13,18,0.96); border: 1px solid rgba(255,255,255,0.12); border-radius: 7px;
+    padding: 10px 12px; min-width: 220px; box-shadow: 0 8px 28px rgba(0,0,0,0.45); }
+  .tt-name { color: #fff; font-weight: 700; font-size: 12px; }
+  .tt-name span { color: #8a9bb2; font-weight: 400; margin-left: 6px; }
+  .tt-plan { color: #8a9bb2; margin: 2px 0 8px; }
+  .tt-hint { margin-top: 8px; color: #5CC8FF; }
+</style>
+</head>
+<body>
+
+<canvas id="map"></canvas>
+
+<div class="panel" id="top">
+  <h1>EVOLUTION MAP</h1>
+  <div class="row">
+    <button id="run">run</button>
+    <select id="speed" title="simulation speed">
+      <option value="0" selected>max speed</option>
+      <option value="2000">2000 tps</option>
+      <option value="500">500 tps</option>
+      <option value="100">100 tps</option>
+    </select>
+    <button id="follow" title="keep 'now' in view (F)">follow</button>
+    <button id="fit" title="fit everything (Z)">fit</button>
+    <button id="all" title="show every established species">show all</button>
+    <button id="reseed" title="new world, new seed">new world</button>
+  </div>
+  <div id="legend"></div>
+</div>
+
+<div class="panel" id="stats">
+  <table>
+    <tr><td>tick</td><td id="s-tick">0</td></tr>
+    <tr><td>ticks / sec</td><td id="s-tps">0</td></tr>
+    <tr><td>organisms</td><td id="s-orgs">0</td></tr>
+    <tr><td>current era</td><td id="s-era">&mdash;</td></tr>
+    <tr><td>eras</td><td id="s-eras">0</td></tr>
+    <tr><td>extinctions</td><td id="s-events">0</td></tr>
+    <tr><td>species</td><td id="s-map">0</td></tr>
+    <tr><td>world resets</td><td id="s-resets">0</td></tr>
+  </table>
+</div>
+
+<div class="panel" id="inset">
+  <canvas id="board" width="300" height="220"></canvas>
+  <div class="cap"><span>live world <span id="grid"></span></span><span>seed <span id="seed"></span></span></div>
+</div>
+
+<button id="help-btn" title="help (?)">?</button>
+<div class="panel" id="help" title="click to hide">
+  <span class="x">&times;</span>Time runs left to right. Each line is a species, thickness its population.
+  Era rulers and their ancestry are shown &mdash; click <b>+N</b> to reveal more.<br><br>
+  <b>drag</b> pan &middot; <b>wheel</b> zoom &middot; <b>shift+wheel</b> zoom time only<br>
+  <b>space</b> run/pause &middot; <b>F</b> follow &middot; <b>Z</b> fit<br>
+  hover a species for its history
+</div>
+
+<div id="tooltip"></div>
+
+<script src="js/evomap.js"></script>
+</body>
+</html>

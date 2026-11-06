@@ -149,6 +149,28 @@ Use ollama only for the layer where it adds something: naming an era and
 writing the one-paragraph story, given the numeric event list. Never in the
 detection path.
 
+### 2b. Evolution map — v1 done
+
+`dist/evomap.html` (run `node tools/serve.js dist 8124`, open
+`http://localhost:8124/evomap.html?seed=123`). A time-scaled phylogeny on an
+infinite canvas, growing to the right as the world runs in a worker.
+
+- x = time, each species a line, thickness = its population at that moment
+- lanes allocated like `git log --graph`: a species keeps its lane forever, so
+  nothing on screen moves when new branches appear
+- visible by default: every era's ruler, today's top species, and the full
+  ancestry of each back to the origin; the rest folds behind `+N` badges
+- each species drawn as its founder's actual body; era bands and extinction
+  events in the background; hover for history, click `+N` to expand
+
+Data comes from `src/Stats/PhyloRecord.js` (off unless the page asks for it).
+Species that die young with no living descendants are folded into a
+`died_young` count on their parent: over a seeded 42k ticks, 12,399 species
+were founded and only 301 are held (2.4%), with 0 broken lineages.
+
+Gaps: the map is its own page, not yet part of the main app; its history isn't
+saved with a world; the founder portrait ignores eye direction.
+
 ### 3. Metabolic upkeep per cell type
 
 Current economics (`Organism.js`):

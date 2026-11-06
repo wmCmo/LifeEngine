@@ -35,6 +35,7 @@ const SimMsg = {
     ORGANISM:     'organism',
     SERIALIZED:   'serialized',
     EXTINCT:      'extinct',
+    PHYLO:        'phylo',         // incremental phylogeny + eras, for the evolution map
     PAUSED:       'paused',        // worker paused itself (auto-pause on extinction)
 };
 

@@ -16,6 +16,8 @@ const Neighbors = require('../Grid/Neighbors');
 const Hyperparams = require('../Hyperparameters');
 const WorldConfig = require('../WorldConfig');
 const Perlin = require('../Utils/Perlin');
+const PhyloRecord = require('../Stats/PhyloRecord');
+const EraRecord = require('../Stats/EraRecord');
 const { SimMsg } = require('./SimProtocol');
 
 // Time inside the tick loop before yielding to handle messages. Long enough
@@ -109,8 +111,18 @@ function sendSnapshot() {
     last_snapshot = now();
 }
 
+function sendPhylo() {
+    if (!env || !PhyloRecord.enabled) return;
+    const update = PhyloRecord.flush(FossilRecord, env.total_ticks);
+    const { eras, events } = EraRecord.summary();
+    update.eras = eras;
+    update.events = events;
+    postMessage({ type: SimMsg.PHYLO, update });
+}
+
 function sendStats() {
     if (!env) return;
+    sendPhylo();
 
     if (stats_mode === 'summary') {
         // Body-plan composition: average cells per organism of each type,
@@ -287,6 +299,7 @@ onmessage = function (e) {
             WorldConfig.headless = true;          // no canvas in here
             if (msg.seed != null) installSeededRandom(msg.seed);
             if (msg.stats_mode) stats_mode = msg.stats_mode;
+            if (msg.want_phylo) PhyloRecord.enabled = true;
             if (msg.params) Hyperparams.loadJsonObj(msg.params);
             env = new WorldEnvironment(fakeEngine, msg.cell_size || 5, {
                 headless: true, cols: msg.cols, rows: msg.rows,

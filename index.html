@@ -1,321 +1,442 @@
 <!DOCTYPE html>
-<html>
-	<head>
-		<meta charset="UTF-8">
-		<title>The Life Engine</title>
-		<link rel="icon" href="./img/icon.png">
-		<link rel="stylesheet" href="./css/style.css">
-		<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.1.2/css/all.min.css">
-		<script type="text/javascript" src="https://canvasjs.com/assets/script/canvasjs.min.js"></script>
-	</head>
-	<body>
-		<script src="./js/bundle.js"></script>
-		
-		<div id='env'>
-			<canvas id='env-canvas'></canvas>
-		</div>
-		<div class='control-panel'>
-			<div id='speed-controller' class='control-set'>
-				<div class='vertical-buttons'>
-					<button class="reset-view" title="Reset View. Hotkey: A"><i class="fa fa-video-camera"></i></button>
-					<button class="edit-mode-btn drag-view" id="drag-view" title="Drag View. Hotkey: S"><i class="fa fa-arrows"></i></button>
-					<button class="edit-mode-btn wall-drop" id="wall-drop" title="Drop/Remove Wall. Hotkey: D"><i class="fa fa-th"></i></button>
-					<button class="edit-mode-btn food-drop selected" id="food-drop" title="Drop/Remove Food. Hotkey: F"><i class="fa fa-cutlery"></i></button>
-					<button class="edit-mode-btn click-kill" id="click-kill" title="Click to kill. Hotkey: G"><i class="fa fa-skull"></i></button>
-				</div>
-				<img src="./img/title.png" alt="Life Engine">
-				<h3>Simulation Speed</h3>
-				<button class='pause-button' title="Play/Pause. Hotkey: Spacebar"><i class="fa fa-pause"></i></button>
-				<button class="headless" title="Toggle rendering. Hotkey: H"><i class="fa fa-eye-slash"></i></button>
-				<input id="slider" type="range" min="1" max="100" value="25">
-				<p id='fps'>Target FPS: 60</p>
-				<p id='fps-actual'></p>
-				<button id='reset-env' title='Restarts simulation with default organism.'>Reset</button>
-				<button id='clear-env' title="Removes all organisms.">Clear</button>
-				<div id="brush-size-container">
-					<label id="brush-slider-label" for="brush-slider" title='Size of the brush for food, walls, and killing'><i class="fa fa-brush"></i> Brush Size </label>
-					<input id="brush-slider" type="range" min="0" max="15" value="2">
-				</div>
-			</div>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Life Engine Lab</title>
+<meta name="description" content="Experiments on The Life Engine: is evolution going in circles, or is it one history out of many?">
+<style>
+  :root {
+    color-scheme: dark;
+    --bg: #0b141b;
+    --bg2: #0f1c25;
+    --panel: #12212c;
+    --line: rgba(255,255,255,0.08);
+    --text: #d6e0ef;
+    --muted: #8193ab;
+    --dim: #56677e;
+    --white: #f3f6fb;
+    --plant: #3FE07A;
+    --armed: #F2B84B;
+    --grazer: #5CC8FF;
+    --predator: #FF4F8B;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Hiragino Sans", sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.6 var(--sans); }
+  a { color: var(--grazer); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .wrap { max-width: 1060px; margin: 0 auto; padding: 0 20px; }
+  .mono { font-family: var(--mono); }
 
-			<div id='tab-container' class='control-set'>
+  /* nav */
+  nav { position: sticky; top: 0; z-index: 5; background: rgba(11,20,27,0.85); backdrop-filter: blur(8px);
+        border-bottom: 1px solid var(--line); }
+  nav .wrap { display: flex; align-items: center; gap: 22px; height: 54px; }
+  nav .brand { font-family: var(--mono); font-weight: 700; letter-spacing: .12em; color: var(--white); font-size: 13px; }
+  nav .links { display: flex; gap: 18px; font-size: 14px; margin-left: auto; }
+  nav .links a { color: var(--muted); }
+  nav .links a:hover { color: var(--white); text-decoration: none; }
+  @media (max-width: 640px) { nav .links .hide-sm { display: none; } }
 
-				<div class="tabnav">
-					<p class='tabnav-item open-tab' id='about'>About</p>
-					<p class='tabnav-item' id='editor'>Editor</p>
-					<p class='tabnav-item' id='world-controls'>World Controls</p>
-					<p class='tabnav-item' id='hyperparameters'>Evolution Controls</p>
-					<p class='tabnav-item' id='stats'>Statistics</p>
-					<button id="minimize" title="Minimze Control Panel."><i class="fa fa-minus-square"></i></button>
-				</div>
+  /* hero */
+  .hero { padding: 72px 0 56px; background:
+            radial-gradient(1200px 500px at 85% -10%, rgba(92,200,255,0.10), transparent 60%),
+            radial-gradient(900px 500px at -10% 110%, rgba(63,224,122,0.08), transparent 60%); }
+  .kicker { font-family: var(--mono); font-size: 12px; letter-spacing: .16em; text-transform: uppercase; color: var(--armed); }
+  h1 { font-size: clamp(36px, 6vw, 64px); line-height: 1.05; margin: 14px 0 18px; color: var(--white); letter-spacing: -0.02em; }
+  .lede { font-size: 19px; color: var(--text); max-width: 680px; margin: 0; }
+  .lede b { color: var(--white); }
+  .cta { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 30px; }
+  .btn { display: inline-flex; align-items: center; gap: 8px; padding: 12px 18px; border-radius: 8px;
+         font-weight: 600; font-size: 15px; border: 1px solid #2b3e50; color: var(--white); background: #16283a; }
+  .btn:hover { text-decoration: none; border-color: #46607a; }
+  .btn.primary { background: var(--plant); border-color: var(--plant); color: #07130c; }
+  .btn.primary:hover { filter: brightness(1.08); }
 
-				<div id='about' class='tab'>
-					<div class='left-half'>
-						<h3>The Life Engine</h3>
-						<p>The Life Engine is a virtual ecosystem that allows organisms to reproduce, compete, and evolve.</p>
-						<p>Each organism is made up of different colored cells. Hover over each color to learn what it does.</p>
-						<div id='cell-legend'>
-							<div class='cell-legend-type' id='mouth' title="Mouth: Eats adjacent food."></div>
-							<div class='cell-legend-type' id='producer' title="Producer: Produces adjacent food."></div>
-							<div class='cell-legend-type' id='mover' title="Mover: Allows for movement and rotation."></div>
-							<div class='cell-legend-type' id='killer' title="Killer: Harms organisms in adjacent cells."></div>
-							<div class='cell-legend-type' id='armor' title="Armor: Negates affects of killer cell."></div>
-							<div class='cell-legend-type' id='eye' title="Eye: Observes cells and decides movement."></div>
-							<div class='cell-legend-type' id='food' title="Food: Not part of an organism. Once an organism has eaten enough food, it will reproduce."></div>
-							<div class='cell-legend-type' id='wall' title="Wall: Not part of an organism. Blocks movement and reproduction."></div>
-						</div>
-						<div id="color-scheme-container">
-							<label for="color-scheme-select">Color Scheme:</label>
-							<select id="color-scheme-select"></select>
-						</div><br>
-					</div>
-					<div class='right-half'>
-						<iframe id="video" src="https://www.youtube.com/embed/iSAKEnRfles"></iframe>
-					</div>
-					<div class='icon-links'>
-						<a href=https://github.com/MaxRobinsonTheGreat/EvolutionSimulatorV2 title='View the code'><i class="fa-brands fa-github"></i></a>
-						<a href="https://discord.gg/ZsrAAByEnr" title='Join the community'><i class="fa-brands fa-discord"></i></a>
-						<a href=" https://www.patreon.com/emergentgarden" title='Support the project'><i class="fa-brands fa-patreon"></i></a>
+  .specimens { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-top: 46px; }
+  @media (max-width: 760px) { .specimens { grid-template-columns: 1fr; } }
+  .spec { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px;
+          display: flex; gap: 16px; align-items: center; }
+  .spec svg { flex: 0 0 auto; }
+  .spec h3 { margin: 0 0 4px; font-size: 15px; color: var(--white); }
+  .spec p { margin: 0; font-size: 13.5px; color: var(--muted); line-height: 1.45; }
+  .spec .tag { font-family: var(--mono); font-size: 11px; color: var(--dim); }
 
-					</div>
-				</div>
+  /* sections */
+  section { padding: 64px 0; border-top: 1px solid var(--line); }
+  section.alt { background: var(--bg2); }
+  h2 { font-size: clamp(26px, 3.6vw, 36px); margin: 0 0 8px; color: var(--white); letter-spacing: -0.01em; }
+  .sub { color: var(--muted); margin: 0 0 32px; max-width: 700px; }
 
-				<div id='editor' class='tab'>
-					<div class='left-half' id='editor-panel'>
-						<div class='editor-buttons'>
-							<button class="edit-mode-btn select" id="select" title="Select organism from world. Hotkey: Z"><i class="fa-regular fa-hand-pointer"></i></button>
-							<button class="edit-mode-btn drop-org" id="drop-org" title="Drop organism in world. Hotkey: C"><i class="fa fa-plus"></i></button>
-							<button id="save-org" title="Save Organism"><i class="fa fa-save"></i></button>
-							<button id="load-org" title="Load Organism"><i class="fa fa-upload"></i></button>
-							<button id="reset-with-editor-org" title="Reset Environment with this Organism"><i class="fa fa-seedling"></i></button>
-							<b id="unnatural-org-warning" title="Unnatural Organism: It has overlapping cells or genetic changes that cannot evolve naturally"><i class="fa fa-biohazard"></i></i></b>
-						</div>
-						<div id='editor-env'>
-							<canvas id='editor-canvas'></canvas>
-						</div>
-						<div id='cell-selections'>
-							<div style='grid-column: 1;'>
-								<div class='cell-type' id='mouth' title="Mouth: Eats adjacent food."></div>
-								<div class='cell-type' id='producer' title="Producer: Produces adjacent food."></div>
-								<div class='cell-type' id='mover' title="Mover: Allows for movement and rotation."></div>
-							</div>
-							<div style='grid-column: 2;'>
-								<div class='cell-type' id='killer' title="Killer: Harms organisms in adjacent cells."></div>
-								<div class='cell-type' id='armor' title="Armor: Unharmed by killer cell."></div>
-								<div class='cell-type' id='eye' title="Eye: Looks for cells to move away from or towards. Click again on a placed cell to rotate"></div>
-							</div>
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  @media (max-width: 900px) { .grid { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 600px) { .grid { grid-template-columns: 1fr; } }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 20px; }
+  .card .big { font-family: var(--mono); font-size: 26px; font-weight: 700; color: var(--white); line-height: 1.1; }
+  .card .big small { font-size: 13px; color: var(--muted); font-weight: 400; }
+  .card h3 { margin: 10px 0 6px; font-size: 16px; color: var(--white); }
+  .card p { margin: 0; font-size: 14.5px; color: var(--text); }
 
-							<button id='clear-editor'>Clear</button>
-							<button class='randomize-button' id='generate-random' title="Randomizes organism"><i class="fa fa-random"></i></button>
-							<br>
-						</div>
-						
-					</div>
-					<div class='right-half'>
-						<div id='edit-organism-details'>
-							<h3>Organism Details</h3>
-							<div id='species-name-cont'>
-								<label for="species-name-edit">Species Name:</label>
-								<input type="text" id="species-name-edit">
-							</div>
-							<p class='cell-count'>Cell count: </p>
-							<div id='move-range-cont'>
-								<label for="move-range-edit" title='The number of cells to move before randomly changing direction. Overriden by brain decisions.'>Move Range:</label>
-								<input type="number" id="move-range-edit" min="1" max="100" value=3 step="1">
-							</div>
-							<div id='mutation-rate-cont'>
-								<label for="mutation-rate-edit" title='Probability that offspring of this organism will mutate'>Mutation Rate:</label>
-								<input type="number" id="mutation-rate-edit" min="1" max="100" value=3 step="1">
-							</div>
-						</div>
-					</div>
-				</div>
-				<div id='world-controls' class='tab'>
-					<div class='left-half'>
-						<h3>Grid Size</h3>
-						<label for="cell-size">Cell Size:</label>
-						<input type="number" id="cell-size" min="1" max="100" value=5 step="1">
-						<label for="fill-window">Fill Window</label>
-						<input type="checkbox" id="fill-window" checked>
-						<div class='col-row-input'>
-							<label for="col-input">Columns:</label>
-							<input type="number" class="grid-size-in" id="col-input" min="1" value=100 step="1">
-							<label for="row-input">Rows:</label>
-							<input type="number" class="grid-size-in" id="row-input" min="1" value=100 step="1">
-						</div>
-						<button id='resize'>Resize and Reset</button>
-						<h3>Reset Options</h3>
-						<label for="auto-reset">Reset on total extinction</label>
-						<input type="checkbox" id="auto-reset" checked>
-						<p id='reset-count'>Auto reset count: </p>
-						<label for="auto-pause" title='Will override reset on extinction'>Pause on total extinction</label>
-						<input type="checkbox" id="auto-pause">
-						<br>
-						<button class='randomize-button reset-random' title="Generate many random organisms in the world.">Reset with Random Organisms</button>
-						<label for="num-random-orgs" title='Number of random organisms to generate'>Num to generate:</label>
-						<input type="number" id="num-random-orgs" min="1" value=100 step="1">
-						<br>
-						<label for="safe-steps-per-tick" title='Safety limit for the max number of simulation steps to compute in each update. Higher values can mean faster updates, but more likely to stall UI.'>Max steps per update:</label>
-						<input type="number" id="safe-steps-per-tick" min="1" value=5 step="1" max="100">
-					</div>
-					<div class='right-half'>
-						<br>
-						<button id='random-walls' title="Generates random walls.">Generate random walls</button> <br>
-						<button id="clear-walls" title="Clear All Walls. Hotkey: B">Clear all walls</button>
-						<br>
-						<label for="clear-walls-reset" title='When on, walls will be cleared when the environment resets'>Clear walls on reset</label>
-						<input type="checkbox" id="clear-walls-reset">
-						<br>
-						<button id='save-env' title="Download save file for entire world">Save World</button>
-						<label for="save-env-name" title='Save World as:'>Save As:</label>
-						<input type="text" id="save-env-name" value="world" style="text-align: center;">.json
-						<br>
-						<button id='load-env' title="Load world save file">Load World</button>
-						<label for="override-controls" title='Override the current evolution controls with those from the loaded world'>Override Evolution Controls</label>
-						<input type="checkbox" id="override-controls" checked>
-					</div>
-				</div>
-				<div id='hyperparameters' class='tab'>
-					<div class='left-half'>
-						<h2>Evolution Controls</h2>
-						<label for="food-prod-prob" title='The probability that a producer cell will produce food each tick.'>Probability of producing food:</label>
-						<input type="number" id="food-prod-prob" min=".001" max="100" value=4 step="1">
-						<br>
-						<label for="lifespan-multiplier" title='An organism lives for this many ticks per cell in its body.'>Lifespan multiplier:</label>
-						<input type="number" id="lifespan-multiplier" min="1" max="10000" value=100 step="1">
-						<br>
-						<label for="rot-enabled" title='Organisms rotate when born and while moving.'>Rotation Enabled</label>
-						<input type="checkbox" id="rot-enabled" checked>
-						<br>
-						<label for="look-range" title='How far an eye cell can see (in number of cells)'>Look range:</label>
-						<input type="number" id="look-range" min="1" max="50" value=30 step="1">
-						<br>
-						<label for="see-through-self" title='Allows eyes to see through an organisms own cells'>See through self:</label>
-						<input type="checkbox" id="see-through-self">
-						<br>
-						<label for="independent-eye-decisions" title='When on, organisms can evolve independent brain decisions for each eye. When off, all eyes will share the same set of decisions. Will not affect existing organism brains, only new mutations.'>Enable independent eye decisions</label>
-						<input type="checkbox" id="independent-eye-decisions">
-						<br>
-						<label for="food-drop-rate" title='Rate at which food is automatically generated and dropped in the world'>Auto food drop rate:</label>
-						<input type="number" id="food-drop-rate" value=0 max="1000">
-						<br>
-						<label for="insta-kill" title='When on, killer cells immediately kill organisms they touch. When off, organisms have as much health as they have cells and only take 1 damage from killer cells.'>One touch kill</label>
-						<input type="checkbox" id="insta-kill">
-						<br>
-						<label for="dont-kill-same-species" title='When on, killer cells will not harm organisms of the same species.'>Don't kill same species</label>
-						<input type="checkbox" id="dont-kill-same-species">
+  .findings { display: grid; gap: 14px; }
+  .finding { display: grid; grid-template-columns: 40px 1fr; gap: 16px; background: var(--panel);
+             border: 1px solid var(--line); border-radius: 12px; padding: 20px 22px; }
+  .finding .n { font-family: var(--mono); font-size: 13px; color: var(--dim); padding-top: 3px; }
+  .finding h3 { margin: 0 0 6px; font-size: 18px; color: var(--white); }
+  .finding p { margin: 0; }
+  .finding .note { margin-top: 8px; font-size: 13.5px; color: var(--muted); }
+  .finding.null h3 { color: var(--muted); }
+  .bar { display: flex; height: 10px; border-radius: 5px; overflow: hidden; margin: 12px 0 4px; max-width: 520px; }
+  .bar i { display: block; height: 100%; }
+  .barlabel { font-family: var(--mono); font-size: 11.5px; color: var(--dim); }
 
-						
-					</div>
-					<div class='right-half'>
-						<button id='reset-rules'>Reset all controls</button>
-						<button id='save-controls' title="Save all Evolution Controls in a .json file">Save & Download</button>
-						<button id='load-controls' title="Load saved Evolution Controls with a .json file">Load</button><br>
-						<label for="org-limit" title='Maximum number of organisms (-1 is unlimited)'>Maximum Organisms:</label>
-						<input type="number" id="org-limit" min="-1" value=-1 step="1"><br>
-						<label for="evolved-mutation" title='When on, each organism has its own mutation rate that can increase or decrease. When off, all organisms have the same mutation rate.'>Use evolved mutation rate</label>
-						<input type="checkbox" id="evolved-mutation" checked>
-						<div class="global-mutation-container">
-							<label class="global-mutation-in" for="global-mutation">Global mutation rate: </label>
-							<input class="global-mutation-in" type="number" id="global-mutation" min="0" max="100" value=5 step="1">
-						</div>
-						<h4 title='When an organism mutates, it can choose from one of the following mutation types. Not mutually exclusive.'>Mutation Type Probabilities</h4>
-						<label for="add-prob" title='A new cell will stem from an existing one'>Add Cell:</label>
-						<input class="mut-prob" type="number" id="add-prob" min="0" max="100" value=25>
-						<label for="change-prob" title='A currently existing cell will change its color.'>Change Cell:</label>
-						<input class="mut-prob" type="number" id="change-prob" min="0" max="100" value=25><br>
-						<label for="remove-prob" title='An existing cell will be removed.'>Remove Cell:</label>
-						<input class="mut-prob" type="number" id="remove-prob" min="0" max="100" value=25>
-						<label for="brain-mutation-chance" title='Some brain decisions will be mutated, or a new brain state will be added.'>Mutate brain</label>
-						<input type="number" id="brain-mutation-chance" min="0" max="100" value=25>
-						<br/>
-						<label for="mutation-symmetry-chance" title='When a cell is added, it has this probability of being mirrored across the horizontal, vertical, and diagonal axes (each has the same chance).'>Mutation symmetry probability</label>
-						<input type="number" id="mutation-symmetry-chance" min="0" max="100" value=10 step="1">
-						<br/>
-						<label for="movers-produce" title='When on, movers can produce food from producer cells. When off, producer cells are disabled on mover organisms.'>Movers can produce food</label>
-						<input type="checkbox" id="movers-produce">
-						<br/>
-						<label for="food-blocks" title='When on, reproduction will fail if offspring intersect with food. When off, offspring will remove blocking food.'>Food blocks reproduction</label>
-						<input type="checkbox" id="food-blocks" checked>
-						<br>
-						<label for="extra-mover-cost" title='Additional food cost for movers to reproduce'>Extra mover reproduction cost:</label>
-						<input type="number" id="extra-mover-cost" value=0 max="1000" step="1">
-						<br>
-						<a id="download-el" style="display: none;"></a>
-						<input id="upload-hyperparams" style="display: none;" type="file">
-					</div>
-				</div>
-				<div id='stats' class='tab'>
-					<div class='left-half'>
-						<h2>Statistics</h2>
-						<p id='org-count'>Total Population: </p>
-						<p id='species-count'>Number of Species: </p>
-						<p id='top-species'>Most Populous Species: </p>
-						<p id='largest-org'>Largest Organism Ever: </p>
-						<p id='avg-mut'>Average Mutation Rate: </p>
-						<label for="chart-option">Chart: </label>
-						<select name="chart-option" id="chart-option">
-							<option value="population">Population</option>
-							<option value="species">Species</option>
-							<option value="mut-rate">Organism Structure</option>
-							<option value="mut-rate">Mutation Rate</option>
-						</select>
-						<p id='chart-note'></p>
-					</div>
-					<div class='right-half'>
-						<div id="chartContainer"></div>
-					</div>
-				</div>
-			</div>
-		</div>
-		<div class='load-panel'>
-			<div class="load-panel-title">
-				<button id='close-load-btn'><i class="fa fa-times"></i></button>
-				<h1>Community Creations</h1>
-			</div><br>
-			<div class="all-list-container">
-				<div class="list-title-container">
-					<h2>🌍Worlds</h2>
-					<div id="worlds-list-container" class="list-container">
-						<ul id="worlds-list"></ul>
-					</div>
-				</div>
-				<div class="list-title-container">
-					<h2>🦠Organisms</h2>
-					<div id="organisms-list-container" class="list-container">
-						<ul id="organisms-list"></ul>
-					</div>
-				</div>
-				<div class="list-title-container">
-					<h2>🔧Mods</h2>
-					<div id="mods-list-container" class="list-container">
-						<ul id="mods-list"></ul>
-					</div>
-				</div>
-			</div>
-			<input id="upload-json" style="display: none;" type="file">
-		</div>
-		<div class='community-section'>
-			<button id="community-creations-btn" title="See worlds and organisms made by the community">Community Creations <i class="fa fa-users"></i></button>
-		</div>
-		<div class='hot-controls'>
-			<button class="reset-view" title="Reset View. Hotkey: A"><i class="fa fa-video-camera"></i></button>
-			<button class="edit-mode-btn drag-view" id="drag-view" title="Drag View. Hotkey: S"><i class="fa fa-arrows"></i></button>
-			<button class="edit-mode-btn wall-drop" id="wall-drop" title="Drop/Remove Wall. Hotkey: D"><i class="fa fa-th"></i></button>
-			<button class="edit-mode-btn food-drop selected" id="food-drop" title="Drop/Remove Food. Hotkey: F"><i class="fa fa-cutlery"></i></button>
-			<button class="edit-mode-btn click-kill" id="click-kill" title="Click to kill. Hotkey: G"><i class="fa fa-skull"></i></button>
-			<button class="headless" title="Toggle rendering. Hotkey: H"><i class="fa fa-eye-slash"></i></button>
-			<button class='pause-button' title="Play/Pause. Hotkey: Spacebar"><i class="fa fa-pause"></i></button>
-            <span class="fps-box"><span id="fps-hot"></span>
-                 <input id="slider-hot" type="range" min="1" max="100" value="25">
-             </span>
-		</div>
-		<div id="headless-notification">
-			<i class="fa fa-eye-slash" ></i>
-		</div>
-		<div id='maximize-hot-control' class='hot-controls'>
-			<button id="maximize" title="Show Control Panel."><i class="fa fa-plus-square"></i></button>
-		</div>
-		
-	</body>
+  .callout { margin-top: 22px; padding: 16px 18px; border-left: 3px solid var(--armed); background: rgba(242,184,75,0.06);
+             border-radius: 0 8px 8px 0; color: var(--text); font-size: 15px; }
+
+  .worlds { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
+  @media (max-width: 700px) { .worlds { grid-template-columns: 1fr; } }
+  .world { display: block; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 18px 20px; color: var(--text); }
+  .world:hover { border-color: #3a5470; text-decoration: none; }
+  .world h3 { margin: 0 0 4px; font-size: 16px; color: var(--white); }
+  .world p { margin: 0; font-size: 14px; color: var(--muted); }
+  .world code { font-family: var(--mono); font-size: 12px; color: var(--armed); }
+
+  .legend { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px 28px; max-width: 760px; }
+  @media (max-width: 640px) { .legend { grid-template-columns: 1fr; } }
+  .legend div { display: flex; gap: 12px; align-items: baseline; }
+  .sw { display: inline-block; width: 12px; height: 12px; border-radius: 3px; flex: 0 0 auto; transform: translateY(1px); }
+  .key { font-family: var(--mono); color: var(--white); flex: 0 0 auto; min-width: 74px; }
+
+  ol.next { padding-left: 20px; margin: 0; max-width: 760px; }
+  ol.next li { margin-bottom: 12px; }
+  ol.next b { color: var(--white); }
+
+  footer { padding: 40px 0 60px; border-top: 1px solid var(--line); color: var(--muted); font-size: 14px; }
+  footer p { margin: 0 0 8px; }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="wrap">
+    <span class="brand">LIFE ENGINE LAB</span>
+    <div class="links">
+      <a href="#found">Findings</a>
+      <a href="#try" class="hide-sm">Try a world</a>
+      <a href="evomap.html?seed=625341585">Evolution map</a>
+    </div>
+  </div>
+</nav>
+
+<header class="hero">
+  <div class="wrap">
+    <div class="kicker">Experiments on The Life Engine</div>
+    <h1>Is evolution<br>going in circles?</h1>
+    <p class="lede">
+      Run <a href="https://thelifeengine.net">The Life Engine</a> long enough and the same two shapes
+      take over: <b>armed plants</b> — producers packed in a checkerboard, killers on the outside —
+      and <b>tiny movers</b> built to dodge them and breed fast. We wanted to know whether that's
+      forced by the rules, or just one history out of many. So we made the simulation fast enough
+      to run hundreds of worlds, taught it what a species is, and drew its family tree as it grows.
+    </p>
+    <div class="cta">
+      <a class="btn primary" href="evomap.html?seed=625341585">Open the evolution map →</a>
+      <a class="btn" href="multiworld.html">Watch 12 worlds at once</a>
+      <a class="btn" href="play.html">Play the original game</a>
+    </div>
+
+    <div class="specimens">
+      <div class="spec">
+        <svg data-org="origin" width="64" height="64"></svg>
+        <div>
+          <h3>Where every world starts</h3>
+          <p>One mouth, two producers. Everything descends from this.</p>
+          <div class="tag">m1 p2 · the origin</div>
+        </div>
+      </div>
+      <div class="spec">
+        <svg data-org="armed" width="64" height="64"></svg>
+        <div>
+          <h3>The armed plant</h3>
+          <p>Producers on the diagonals, killers and armour on the rim. A real one, from a long run.</p>
+          <div class="tag">dudvq565qj</div>
+        </div>
+      </div>
+      <div class="spec">
+        <svg data-org="mover" width="64" height="64"></svg>
+        <div>
+          <h3>The fast mover</h3>
+          <p>Five cells: move, eat, see, kill. Chases loose food, turns away from other bodies.</p>
+          <div class="tag">4uelw9kuw0</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<section id="built">
+  <div class="wrap">
+    <h2>What we built</h2>
+    <p class="sub">Everything here runs in your browser. The source and every write-up are on GitHub.</p>
+    <div class="grid">
+      <div class="card">
+        <div class="big">10–20× <small>faster</small></div>
+        <h3>A simulation that isn't held back</h3>
+        <p>The original was paced by the browser's timer and topped out around 170 steps a second on a typical board.
+           It now runs in a background thread: 2,000–4,000 steps a second, and 13,000–28,000 across a dozen worlds at once.</p>
+      </div>
+      <div class="card">
+        <div class="big">173 → 7 <small>species</small></div>
+        <h3>Species that mean something</h3>
+        <p>The original counted every mutant as a new species — 173 of them in one seeded world, which is really about
+           seven. Now a species is everything within a quarter of its founder's body, and every lineage traces back to
+           the very first organism.</p>
+      </div>
+      <div class="card">
+        <div class="big">eras <small>&amp; extinctions</small></div>
+        <h3>History, detected from the numbers</h3>
+        <p>An era is one species' reign. A mass extinction is a crash that wipes out at least half the established
+           lineages. No guessing involved.</p>
+      </div>
+      <div class="card">
+        <div class="big">the map</div>
+        <h3>A family tree that keeps growing</h3>
+        <p>Time runs left to right, line thickness is population, and every species is drawn as its actual body.
+           Rulers and their ancestors are shown; click to reveal the rest.</p>
+      </div>
+      <div class="card">
+        <div class="big">12 <small>worlds at once</small></div>
+        <h3>Parallel worlds</h3>
+        <p>Same rules, different seeds, side by side. It's the only way to tell what's forced from what's luck.</p>
+      </div>
+      <div class="card">
+        <div class="big">200+ <small>worlds run</small></div>
+        <h3>Measured, not eyeballed</h3>
+        <p>Headless sweeps over the evolution settings, several seeds each, so a result has to beat
+           the noise before we call it one.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="found" class="alt">
+  <div class="wrap">
+    <h2>What we found</h2>
+    <p class="sub">The short answer: <b style="color:var(--white)">partly.</b> Some of it is forced, some of it is luck,
+       and the amount of food decides which.</p>
+
+    <div class="findings">
+      <div class="finding">
+        <div class="n">01</div>
+        <div>
+          <h3>The plant/animal split is forced. The arms race on top of it isn't.</h3>
+          <p>Across 12 worlds with different seeds, mouths and producers always made up most of every body
+             (mouths 25–39%, producers 28–51%). Everything to do with fighting varied far more: killers six-fold,
+             armour from 0% to 16% — and at least one world never evolved eyes at all.</p>
+          <div class="bar" aria-hidden="true">
+            <i style="width:29%;background:#DEB14D"></i><i style="width:41%;background:#15DE59"></i>
+            <i style="width:11%;background:#60D4FF"></i><i style="width:11%;background:#F82380"></i>
+            <i style="width:2%;background:#7230DB"></i><i style="width:6%;background:#B6C1EA"></i>
+          </div>
+          <div class="barlabel">average body: mouth 29% · producer 41% · mover 11% · killer 11% · armour 2% · eye 6%</div>
+        </div>
+      </div>
+
+      <div class="finding">
+        <div class="n">02</div>
+        <div>
+          <h3>The armed-plant world came out of an extinction.</h3>
+          <p>In one seeded world, an 83% population crash wiped out 29 of 33 established lineages — mostly grazers.
+             Armed plants took over afterwards and made up 72% of all life. The shape from the top of this page
+             didn't drift into being; it rose from the wreckage.</p>
+        </div>
+      </div>
+
+      <div class="finding">
+        <div class="n">03</div>
+        <div>
+          <h3>Food decides almost everything.</h3>
+          <p>More food means smaller bodies: in every combination of settings we tried, the richest worlds had the
+             smallest, and at high food every world converges on bodies of about three cells. Predators and eyes
+             thrive only when food is scarce; with plenty they nearly vanish. And the default sits right at the edge:
+             3 of 20 worlds there went extinct at some point; none of 60 did with a little more food.</p>
+        </div>
+      </div>
+
+      <div class="finding">
+        <div class="n">04</div>
+        <div>
+          <h3>Scarcity is where worlds go their own way.</h3>
+          <p>Plenty of food makes every world end up the same. Scarce food, with plants and animals allowed to mix,
+             is where separate worlds take different paths and the most different body plans take turns ruling.</p>
+        </div>
+      </div>
+
+      <div class="finding">
+        <div class="n">05</div>
+        <div>
+          <h3>A grazer boom ended in collapse.</h3>
+          <p>In a 120,000-tick world, grazers took over; then a mass extinction wiped out 46 of 56 lineages, almost all
+             of them plants, and the grazers died out after them. Armed plants came back.</p>
+          <p class="note">It looks like overgrazing — that's our reading of the sequence, not a measured cause.</p>
+        </div>
+      </div>
+
+      <div class="finding">
+        <div class="n">06</div>
+        <div>
+          <h3>Some shapes keep coming back.</h3>
+          <p>In two separate worlds, the same three-cell grazer with an eye rose to rule, went extinct, and then showed
+             up again as a new species.</p>
+          <p class="note">Same cell counts, different species. Whether it truly evolved independently twice isn't verified yet.</p>
+        </div>
+      </div>
+
+      <div class="finding null">
+        <div class="n">07</div>
+        <div>
+          <h3>Charging rent for every cell didn't help.</h3>
+          <p>We added a metabolic cost per cell, scaled the way real animals' metabolism scales. At default food it made
+             no measurable difference: it only slows births, and the gap between "too weak to matter" and "everything starves"
+             is narrow. A null result — still worth knowing.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="callout">
+      <b>How sure are we?</b> Worlds are noisy: the very same settings gave anywhere from 2.6 to 9.8
+      effective species across five seeds. Everything above is a result that clears that noise, unless it says otherwise.
+      The full numbers are in the <a href="https://github.com/wmCmo/LifeEngine/tree/perf/sim-worker/docs/sweeps">sweep write-ups</a>.
+    </div>
+  </div>
+</section>
+
+<section id="try">
+  <div class="wrap">
+    <h2>Try a world</h2>
+    <p class="sub">Every link carries a seed and its settings, so everyone who opens it watches the same world unfold.
+       Change the settings on the map and use <b style="color:var(--white)">copy link</b> to share your own.</p>
+    <div class="worlds">
+      <a class="world" href="evomap.html?seed=625341585">
+        <h3>The default world</h3>
+        <p>The original rules. Watch the origin plant's age end and see what takes over.</p>
+        <code>?seed=625341585</code>
+      </a>
+      <a class="world" href="evomap.html?seed=625341585&amp;food=7&amp;mcp=1&amp;drop=5">
+        <h3>Most divergent histories</h3>
+        <p>A little more food, plants and animals allowed to mix, food falling from the sky. Never went extinct; worlds disagreed the most.</p>
+        <code>?food=7&amp;mcp=1&amp;drop=5</code>
+      </a>
+      <a class="world" href="evomap.html?seed=625341585&amp;food=10">
+        <h3>Most species at once</h3>
+        <p>Food at 10 — the richest snapshot diversity we measured, twice.</p>
+        <code>?food=10</code>
+      </a>
+      <a class="world" href="evomap.html?seed=625341585&amp;food=14">
+        <h3>Abundance</h3>
+        <p>So much food that every world converges on tiny bodies. Evolution in circles, on purpose.</p>
+        <code>?food=14</code>
+      </a>
+      <a class="world" href="evomap.html?seed=625341585&amp;food=5&amp;drop=5">
+        <h3>Scarce, with hunters</h3>
+        <p>Predators and eyes take over. Risky: one world in five died.</p>
+        <code>?food=5&amp;drop=5</code>
+      </a>
+      <a class="world" href="multiworld.html?food=7&amp;mcp=1&amp;drop=5">
+        <h3>Twelve worlds, one setting</h3>
+        <p>The divergent setting in parallel — see how differently twelve worlds turn out.</p>
+        <code>multiworld · ?food=7&amp;mcp=1&amp;drop=5</code>
+      </a>
+    </div>
+  </div>
+</section>
+
+<section class="alt">
+  <div class="wrap">
+    <h2>Reading the map</h2>
+    <p class="sub">Each species is coloured by how it lives.</p>
+    <div class="legend">
+      <div><span class="sw" style="background:var(--plant)"></span><span class="key">plant</span><span>can't move, no killer cell</span></div>
+      <div><span class="sw" style="background:var(--armed)"></span><span class="key">armed plant</span><span>can't move, has a killer cell</span></div>
+      <div><span class="sw" style="background:var(--grazer)"></span><span class="key">grazer</span><span>moves, no killer cell</span></div>
+      <div><span class="sw" style="background:var(--predator)"></span><span class="key">predator</span><span>moves, has a killer cell</span></div>
+      <div><span class="key">m2 p1 k1</span><span>a body plan: 2 mouths, 1 producer, 1 killer — v mover, a armour, e eye</span></div>
+      <div><span class="key">★ / ▲</span><span>ruled an era / most populous right now</span></div>
+      <div><span class="key">+N</span><span>more descendants hidden — click to show them</span></div>
+      <div><span class="key" style="color:#ff6b88">red band</span><span>a mass extinction; amber bands are population crashes</span></div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>What's next</h2>
+    <ol class="next">
+      <li><b>Rent at high food.</b> Abundance is where every world converges on tiny bodies — a cost of existing
+          might push back there, where it couldn't at default food.</li>
+      <li><b>Terrain and climate.</b> Right now every square of the world is the same forever, so each niche has
+          exactly one answer. Gradients, seasons and barriers that rise and fall should give evolution more than one.</li>
+      <li><b>Named eras.</b> The detector already finds them; a local language model can tell their story.</li>
+      <li><b>Brains that have to be earned.</b> A neuron cell that costs upkeep, so intelligence only evolves
+          where it pays — and you can watch the moment it does.</li>
+    </ol>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <p>Built on <a href="https://thelifeengine.net">The Life Engine</a> by Max Robinson
+       (<a href="https://github.com/MaxRobinsonTheGreat/LifeEngine">source</a>), from its <span class="mono">develop</span> branch.
+       All credit for the engine is his.</p>
+    <p>This fork: <a href="https://github.com/wmCmo/LifeEngine/tree/perf/sim-worker">wmCmo/LifeEngine</a> ·
+       <a href="https://github.com/wmCmo/LifeEngine/blob/perf/sim-worker/ROADMAP.md">roadmap and notes</a> ·
+       <a href="https://github.com/wmCmo/LifeEngine/tree/perf/sim-worker/docs/sweeps">sweep write-ups</a></p>
+  </div>
+</footer>
+
+<script>
+  // Real anatomies: the origin organism (WorldEnvironment.OriginOfLife) and two
+  // organisms exported from a long run. [col, row, cell].
+  const ORGS = {
+    origin: [[0,0,'mouth'],[1,1,'producer'],[-1,-1,'producer']],
+    armed:  [[0,0,'mouth'],[-1,-1,'producer'],[-2,0,'killer'],[0,-2,'mouth'],[-1,1,'producer'],
+             [1,1,'producer'],[1,-1,'producer'],[0,2,'armor'],[2,0,'killer']],
+    mover:  [[-1,0,'mouth'],[0,-1,'eye'],[0,1,'eye'],[1,0,'killer'],[0,0,'mover']],
+  };
+  const COLOR = { mouth:'#DEB14D', producer:'#15DE59', mover:'#60D4FF', killer:'#F82380', armor:'#7230DB', eye:'#B6C1EA' };
+  const NS = 'http://www.w3.org/2000/svg';
+  for (const svg of document.querySelectorAll('svg[data-org]')) {
+    const cells = ORGS[svg.dataset.org];
+    const cs = cells.map(c => c[0]), rs = cells.map(c => c[1]);
+    const minC = Math.min(...cs), minR = Math.min(...rs);
+    const w = Math.max(...cs) - minC + 1, h = Math.max(...rs) - minR + 1;
+    const size = 64, cell = Math.floor((size - 8) / Math.max(w, h, 3));
+    const ox = (size - w * cell) / 2, oy = (size - h * cell) / 2;
+    const bg = document.createElementNS(NS, 'rect');
+    bg.setAttribute('width', size); bg.setAttribute('height', size); bg.setAttribute('rx', 10);
+    bg.setAttribute('fill', '#0b141b');
+    svg.appendChild(bg);
+    for (const [c, r, kind] of cells) {
+      const rect = document.createElementNS(NS, 'rect');
+      rect.setAttribute('x', ox + (c - minC) * cell);
+      rect.setAttribute('y', oy + (r - minR) * cell);
+      rect.setAttribute('width', cell); rect.setAttribute('height', cell);
+      rect.setAttribute('fill', COLOR[kind]);
+      svg.appendChild(rect);
+      if (kind === 'eye') {
+        const slit = document.createElementNS(NS, 'rect');
+        slit.setAttribute('x', ox + (c - minC) * cell + cell * 0.38);
+        slit.setAttribute('y', oy + (r - minR) * cell + cell * 0.15);
+        slit.setAttribute('width', cell * 0.24); slit.setAttribute('height', cell * 0.7);
+        slit.setAttribute('fill', '#0b141b');
+        svg.appendChild(slit);
+      }
+    }
+    svg.setAttribute('role', 'img');
+    svg.setAttribute('aria-label', svg.dataset.org + ' organism');
+  }
+</script>
+</body>
 </html>

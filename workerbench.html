@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sim Worker Benchmark</title>
+<style>
+  :root { color-scheme: dark; }
+  body {
+    margin: 0; padding: 16px;
+    background: #0E1318; color: #B6C1EA;
+    font: 13px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  h1 { font-size: 15px; margin: 0 0 12px; color: #60D4FF; font-weight: 600; }
+  .wrap { display: flex; gap: 20px; flex-wrap: wrap; align-items: flex-start; }
+  canvas { background: #0E1318; border: 1px solid #243040; image-rendering: pixelated; max-width: 100%; }
+  .panel { min-width: 260px; }
+  table { border-collapse: collapse; margin-bottom: 14px; }
+  td { padding: 3px 14px 3px 0; }
+  td.k { color: #5a6b85; }
+  td.v { color: #DEB14D; font-variant-numeric: tabular-nums; }
+  td.v.big { font-size: 20px; color: #15DE59; }
+  button {
+    background: #15DE59; color: #0E1318; border: 0; border-radius: 4px;
+    padding: 7px 18px; font: inherit; font-weight: 700; cursor: pointer; margin-right: 8px;
+  }
+  button.alt { background: #243040; color: #B6C1EA; }
+  label { display: block; margin: 10px 0 2px; color: #5a6b85; }
+  input[type=range] { width: 220px; }
+  .note { margin-top: 16px; color: #5a6b85; max-width: 320px; }
+</style>
+</head>
+<body>
+
+<h1>sim worker benchmark</h1>
+
+<div class="wrap">
+  <canvas id="board" width="800" height="600"></canvas>
+
+  <div class="panel">
+    <table>
+      <tr><td class="k">ticks / sec</td><td class="v big" id="tps">0</td></tr>
+      <tr><td class="k">peak</td><td class="v" id="peak">0</td></tr>
+      <tr><td class="k">total ticks</td><td class="v" id="ticks">0</td></tr>
+      <tr><td class="k">organisms</td><td class="v" id="orgs">0</td></tr>
+      <tr><td class="k">render fps</td><td class="v" id="renderfps">0</td></tr>
+      <tr><td class="k">grid</td><td class="v" id="grid">-</td></tr>
+      <tr><td class="k">status</td><td class="v" id="status">booting</td></tr>
+    </table>
+
+    <button id="run">run</button>
+    <button id="reset" class="alt">reset</button>
+
+    <label>target fps - <span id="fpslabel">unlimited</span></label>
+    <input type="range" id="fps" min="0" max="1000" step="10" value="0">
+
+    <label>snapshots / sec - <span id="snaplabel">30</span></label>
+    <input type="range" id="snaphz" min="1" max="60" step="1" value="30">
+
+    <div class="note">
+      Target fps 0 means the sim runs as fast as the CPU allows.
+      Drag it up from 0 to see the old fixed-timestep behaviour, where the
+      sim refuses to exceed the target.
+    </div>
+  </div>
+</div>
+
+<script src="js/workerbench.js"></script>
+</body>
+</html>

@@ -5,6 +5,7 @@ module.exports = {
     entry: {
         bundle: './src/index.js',
         workerbench: './src/worker-bench.js',
+        multiworld: './src/multiworld.js',
     },
     output: {
         filename: '[name].js',

@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Parallel Worlds</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 16px;
+    background: #0B0E12; color: #B6C1EA;
+    font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  h1 { font-size: 14px; margin: 0 0 2px; color: #60D4FF; font-weight: 600; letter-spacing: .02em; }
+  .sub { color: #52627d; margin-bottom: 14px; max-width: 70ch; }
+
+  .layout { display: flex; gap: 18px; align-items: flex-start; flex-wrap: wrap; }
+  .left { flex: 1 1 560px; min-width: 300px; }
+  .right { flex: 0 0 280px; }
+
+  #grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+  .world { background: #0E1318; border: 1px solid #1d2733; border-radius: 5px; padding: 5px; }
+  .world canvas {
+    width: 100%; height: auto; display: block;
+    image-rendering: pixelated; background: #0E1318; border-radius: 3px;
+  }
+  .meta { display: flex; justify-content: space-between; margin-top: 4px; font-size: 10px; }
+  .idx { color: #3f4d61; }
+  .st { color: #7d8ba3; }
+  .st.died { color: #F82380; }
+  .bar { display: flex; height: 5px; margin-top: 4px; border-radius: 3px; overflow: hidden; background: #161d26; }
+  .bar i { display: block; height: 100%; }
+
+  .panel { background: #0E1318; border: 1px solid #1d2733; border-radius: 5px; padding: 12px; margin-bottom: 12px; }
+  .panel h2 { font-size: 11px; margin: 0 0 8px; color: #52627d; text-transform: uppercase; letter-spacing: .08em; font-weight: 600; }
+  table { border-collapse: collapse; width: 100%; }
+  td { padding: 2px 0; }
+  td:first-child { color: #52627d; }
+  td:not(:first-child) { text-align: right; color: #DEB14D; font-variant-numeric: tabular-nums; }
+  td i { display: inline-block; width: 7px; height: 7px; border-radius: 2px; margin-right: 6px; }
+  .big { font-size: 22px; color: #15DE59; font-variant-numeric: tabular-nums; }
+  #verdict { color: #B6C1EA; margin-top: 6px; font-size: 11px; }
+
+  button {
+    background: #15DE59; color: #0B0E12; border: 0; border-radius: 4px;
+    padding: 7px 16px; font: inherit; font-weight: 700; cursor: pointer; margin-right: 6px;
+  }
+  button.alt { background: #1d2733; color: #B6C1EA; }
+  label { color: #52627d; }
+  input[type=number] { width: 54px; background: #161d26; color: #B6C1EA; border: 1px solid #28364a; border-radius: 3px; padding: 4px; font: inherit; }
+</style>
+</head>
+<body>
+
+<h1>parallel worlds</h1>
+<div class="sub">
+  Independent simulations, one worker each, different seeds. If every world
+  settles on the same body plan, the shape is forced by the rules. If they
+  settle differently, it was contingent &mdash; one history out of many.
+</div>
+
+<div class="layout">
+  <div class="left"><div id="grid"></div></div>
+
+  <div class="right">
+    <div class="panel">
+      <h2>throughput</h2>
+      <table>
+        <tr><td>ticks / sec</td><td class="big" id="total-tps">0</td></tr>
+        <tr><td>total ticks</td><td id="total-ticks">0</td></tr>
+        <tr><td>organisms</td><td id="total-orgs">0</td></tr>
+        <tr><td>worlds alive</td><td id="alive">-</td></tr>
+        <tr><td>cores</td><td id="cores">-</td></tr>
+      </table>
+    </div>
+
+    <div class="panel">
+      <h2>convergence</h2>
+      <table><tr><td>divergence</td><td class="big" id="divergence">-</td></tr></table>
+      <div id="verdict"></div>
+    </div>
+
+    <div class="panel">
+      <h2>body plan &mdash; mean and range</h2>
+      <table><tbody id="comp-rows"></tbody></table>
+    </div>
+
+    <div class="panel">
+      <h2>controls</h2>
+      <button id="run">run all</button>
+      <button id="reseed" class="alt">reseed</button>
+      <div style="margin-top:10px">
+        <label>worlds <input type="number" id="count" min="2" max="24" value="8"></label>
+        <span style="color:#3f4d61"> running <span id="worldcount">0</span></span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="js/multiworld.js"></script>
+</body>
+</html>

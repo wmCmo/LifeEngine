@@ -38,6 +38,25 @@ let tps = 0;
 let tps_ticks = 0;
 let tps_since = 0;
 
+// 'full' ships the whole fossil record for the charts. 'summary' ships only
+// scalars plus the current body-plan composition, which is what a grid of
+// parallel worlds needs - sending 500-point records from 16 workers once a
+// second is pure overhead.
+let stats_mode = 'full';
+
+// Optional per-world determinism. Seeding here rather than in the engine keeps
+// it worker-scoped: each world gets its own stream, and a run can be repeated
+// exactly. Without a seed the worlds just use the default Math.random.
+function installSeededRandom(seed) {
+    let s = (seed >>> 0) || 1;
+    Math.random = function () {
+        s ^= s << 13; s >>>= 0;
+        s ^= s >> 17;
+        s ^= s << 5;  s >>>= 0;
+        return s / 4294967296;
+    };
+}
+
 // WorldEnvironment.reset() calls back into an engine; give it one.
 const fakeEngine = {
     fps: 60,
@@ -92,6 +111,28 @@ function sendSnapshot() {
 
 function sendStats() {
     if (!env) return;
+
+    if (stats_mode === 'summary') {
+        // Body-plan composition: average cells per organism of each type,
+        // weighted by population. This is the number that answers "did these
+        // worlds converge on the same shape".
+        const cc = FossilRecord.av_cell_counts;
+        const ac = FossilRecord.av_cells;
+        postMessage({
+            type: SimMsg.STATS,
+            ticks: env.total_ticks,
+            organisms: env.organisms.length,
+            reset_count: env.reset_count,
+            largest_cell_count: env.largest_cell_count,
+            average_mutability: env.averageMutability(),
+            num_extant: FossilRecord.numExtantSpecies(),
+            avg_cells: ac.length ? ac[ac.length - 1] : 0,
+            composition: cc.length ? cc[cc.length - 1] : null,
+        });
+        last_stats = now();
+        return;
+    }
+
     const species = {};
     for (const s of Object.values(FossilRecord.extant_species)) {
         species[s.name] = {
@@ -244,6 +285,8 @@ onmessage = function (e) {
 
         case SimMsg.INIT: {
             WorldConfig.headless = true;          // no canvas in here
+            if (msg.seed != null) installSeededRandom(msg.seed);
+            if (msg.stats_mode) stats_mode = msg.stats_mode;
             if (msg.params) Hyperparams.loadJsonObj(msg.params);
             env = new WorldEnvironment(fakeEngine, msg.cell_size || 5, {
                 headless: true, cols: msg.cols, rows: msg.rows,

@@ -190,7 +190,18 @@ world converge, while scarcity with the plant/animal barrier down is where
 worlds take different paths. Candidate setting against "evolving in
 circles": food 7, movers can produce, food drop 5.
 
-### 3. Metabolic upkeep per cell type
+### 3. Metabolic upkeep — built, and a null result at default food
+
+Built as `upkeepScale` (off at 0, Kleiber 0.75 exponent) plus
+`lifespanExponent`; off is verified to be the original game. Results in
+[docs/sweeps/sweep-3.md](docs/sweeps/sweep-3.md): in the range where life
+survives, upkeep doesn't measurably change what evolves — starvation is ≤1% of
+deaths, so it only taxes the birth rate, and the window before extinction is
+too narrow. Kleiber lifespan robustly shrinks bodies. Untested: upkeep at high
+food, where worlds converge and a cost of existing might push back.
+
+Original reasoning (written before the sweep; the "free cells let useless organs
+survive" part turned out wrong — under 5% of movers carry one):
 
 Current economics (`Organism.js`):
 

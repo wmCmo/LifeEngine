@@ -249,7 +249,7 @@ class EvoMap {
         if (!any) return;
         // The origin is always at the far left, which is where the controls
         // panel sits - so start the tree below it, not under it.
-        const TOP = 185;
+        const TOP = 230;
         const span = Math.max(this.now, 1000);
         this.cam.sx = (this.W - LEFT_MARGIN - 40) / span;
         this.cam.sy = Math.max(8, Math.min(60, (this.H - AXIS_H - TOP - 30) / Math.max(maxL - minL + 1, 1)));

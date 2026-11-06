@@ -1,11 +1,14 @@
 // Evolution map page: runs one world in a worker at full speed and draws its
-// phylogeny live. URL params: ?cols=300&rows=220&seed=123
+// phylogeny live. URL params: ?cols=300&rows=220&seed=123 plus any simulation
+// setting from src/Sim/UrlSettings.js, e.g. &food=7&mcp=1&drop=5 - so a link
+// reproduces the exact world.
 
 const SnapshotRenderer = require('./Sim/SnapshotRenderer');
 const CellStates = require('./Organism/Cell/CellStates');
 const Hyperparams = require('./Hyperparameters');
 const { SimMsg } = require('./Sim/SimProtocol');
 const { EvoMap, GUILD_COLOR, GUILD_LABEL } = require('./Map/EvoMap');
+const { PRESETS, parseSettings, applySettings, currentSettings, settingsQuery, matchPreset } = require('./Sim/UrlSettings');
 
 const NEON = {
     empty: '#0E1318', food: '#2F7AB7', wall: '#FFFFFF', mouth: '#DEB14D',
@@ -17,6 +20,28 @@ const params = new URLSearchParams(location.search);
 const COLS = parseInt(params.get('cols') || '300');
 const ROWS = parseInt(params.get('rows') || '220');
 const SEED = params.has('seed') ? parseInt(params.get('seed')) : (Date.now() & 0x7fffffff);
+
+// Settings from the URL go into Hyperparams before the worker is created -
+// it takes its copy at INIT and keeps it for the life of the world.
+const SETTINGS = parseSettings(params);
+applySettings(SETTINGS.values);
+
+// Settings change the rules, so they start a new world - on the same seed, so
+// two settings can be compared from the same start.
+function gotoSettings(values) {
+    const q = settingsQuery(values, SEED);
+    const keep = new URLSearchParams(q);
+    if (params.has('cols')) keep.set('cols', params.get('cols'));
+    if (params.has('rows')) keep.set('rows', params.get('rows'));
+    location.search = keep.toString();
+}
+
+function shareLink() {
+    const q = new URLSearchParams(settingsQuery(SETTINGS.values, SEED));
+    if (params.has('cols')) q.set('cols', params.get('cols'));
+    if (params.has('rows')) q.set('rows', params.get('rows'));
+    return `${location.origin}${location.pathname}?${q.toString()}`;
+}
 
 function $id(id) { return document.getElementById(id); }
 function fmt(n) { return (n || 0).toLocaleString(); }
@@ -66,6 +91,62 @@ function boot() {
 
     $id('seed').textContent = SEED;
     $id('grid').textContent = `${COLS}×${ROWS}`;
+
+    // Active settings line.
+    const active = $id('active');
+    const bits = SETTINGS.labels.slice();
+    active.classList.toggle('plain', bits.length === 0);
+    active.innerHTML = (bits.length ? bits.join(' · ') : 'default settings')
+        + (SETTINGS.invalid.length ? ` <span class="bad">· ignored: ${SETTINGS.invalid.join(', ')}</span>` : '');
+
+    // Presets from the sweeps.
+    const preset = $id('preset');
+    const matched = matchPreset(SETTINGS.values);
+    preset.innerHTML = PRESETS.map(p => `<option value="${p.id}">${p.label}</option>`).join('')
+        + (matched ? '' : '<option value="" selected>custom settings</option>');
+    if (matched) preset.value = matched;
+    preset.addEventListener('change', () => {
+        const p = PRESETS.find(x => x.id === preset.value);
+        if (p) gotoSettings(p.query);
+    });
+
+    // Editor.
+    const cur = currentSettings();
+    $id('e-food').value = cur.food;
+    $id('e-drop').value = cur.drop;
+    $id('e-life').value = cur.life;
+    $id('e-movercost').value = cur.movercost;
+    $id('e-mcp').checked = !!cur.mcp;
+    $id('e-kin').checked = !!cur.kin;
+    $id('edit').addEventListener('click', () => {
+        const ed = $id('editor');
+        ed.hidden = !ed.hidden;
+        $id('edit').classList.toggle('on', !ed.hidden);
+    });
+    $id('apply').addEventListener('click', () => {
+        gotoSettings({
+            ...SETTINGS.values,
+            food: parseFloat($id('e-food').value),
+            drop: parseFloat($id('e-drop').value),
+            life: parseFloat($id('e-life').value),
+            movercost: parseInt($id('e-movercost').value, 10),
+            mcp: $id('e-mcp').checked,
+            kin: $id('e-kin').checked,
+        });
+    });
+
+    // Copy a link to exactly this world.
+    $id('copy').addEventListener('click', async () => {
+        const link = shareLink();
+        try {
+            await navigator.clipboard.writeText(link);
+            $id('copy').textContent = 'copied!';
+        } catch (e) {
+            window.prompt('Copy this link:', link);
+        }
+        $id('copy').classList.add('done');
+        setTimeout(() => { $id('copy').textContent = 'copy link'; $id('copy').classList.remove('done'); }, 1500);
+    });
     $id('legend').innerHTML = Object.keys(GUILD_LABEL).filter(k => k !== 'unknown').map(k =>
         `<span><i style="background:${GUILD_COLOR[k]}"></i>${GUILD_LABEL[k]}</span>`).join('');
 
@@ -116,7 +197,9 @@ function boot() {
     $id('help-btn').addEventListener('click', () => setHelp(true));
 
     window.addEventListener('keydown', (e) => {
-        if (e.target.tagName === 'SELECT') return;
+        // Typing a value into the settings editor mustn't pause the world
+        // or toggle follow.
+        if (['SELECT', 'INPUT', 'TEXTAREA'].includes(e.target.tagName)) return;
         if (e.key === '?') setHelp($id('help').style.display === 'none');
         if (e.code === 'Space') { e.preventDefault(); setRunning(!running); }
         if (e.key === 'f') map.setFollow(!map.follow);

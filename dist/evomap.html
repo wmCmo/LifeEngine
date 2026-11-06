@@ -32,6 +32,18 @@
   td:last-child { text-align: right; color: #e9eef7; font-variant-numeric: tabular-nums; }
   i { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; }
   #legend { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-top: 10px; color: #8a9bb2; }
+  select#preset { max-width: 150px; }
+  #active { margin-top: 8px; color: #F2B84B; }
+  #active.plain { color: #6c7d93; }
+  #active .bad { color: #ff6b88; }
+  #editor { margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.07); }
+  #editor .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 10px; }
+  #editor label { display: flex; flex-direction: column; color: #8a9bb2; gap: 2px; }
+  #editor label.cb { flex-direction: row; align-items: center; gap: 6px; margin-top: 6px; }
+  #editor input[type=number] { font: inherit; background: #1a2836; color: #e9eef7; border: 1px solid #2a3a4c;
+    border-radius: 4px; padding: 3px 6px; width: 100%; }
+  #editor .hint { color: #6c7d93; }
+  button#copy.done { background: #3FE07A; color: #08121a; border-color: #3FE07A; }
 
   #inset { bottom: 40px; left: 14px; padding: 8px; }
   #board { display: block; width: 240px; height: auto; image-rendering: pixelated; border-radius: 4px; background: #0E1318; }
@@ -68,7 +80,24 @@
     <button id="follow" title="keep 'now' in view (F)">follow</button>
     <button id="fit" title="fit everything (Z)">fit</button>
     <button id="all" title="show every established species">show all</button>
-    <button id="reseed" title="new world, new seed">new world</button>
+    <button id="reseed" title="new world, new seed, same settings">new world</button>
+  </div>
+  <div class="row">
+    <select id="preset" title="settings found by the parameter sweeps"></select>
+    <button id="edit" title="change settings">settings</button>
+    <button id="copy" title="copy a link to this exact world - seed and settings">copy link</button>
+  </div>
+  <div id="active"></div>
+  <div id="editor" hidden>
+    <div class="grid">
+      <label>food production <input id="e-food" type="number" min="0" max="100" step="1"></label>
+      <label>auto food drop <input id="e-drop" type="number" min="0" max="100" step="1"></label>
+      <label>lifespan × <input id="e-life" type="number" min="1" max="10000" step="10"></label>
+      <label>mover cost + <input id="e-movercost" type="number" min="0" max="1000" step="1"></label>
+    </div>
+    <label class="cb"><input id="e-mcp" type="checkbox"> movers can produce food</label>
+    <label class="cb"><input id="e-kin" type="checkbox"> don't kill own species</label>
+    <div class="row"><button id="apply">new world with these</button><span class="hint">same seed, so you can compare</span></div>
   </div>
   <div id="legend"></div>
 </div>
@@ -97,7 +126,9 @@
   Era rulers and their ancestry are shown &mdash; click <b>+N</b> to reveal more.<br><br>
   <b>drag</b> pan &middot; <b>wheel</b> zoom &middot; <b>shift+wheel</b> zoom time only<br>
   <b>space</b> run/pause &middot; <b>F</b> follow &middot; <b>Z</b> fit<br>
-  hover a species for its history
+  hover a species for its history<br><br>
+  Settings live in the link, e.g. <b>?seed=42&amp;food=7&amp;mcp=1&amp;drop=5</b>.
+  Also: life, movercost, kin, insta, block, mut, sym, look, species.
 </div>
 
 <div id="tooltip"></div>

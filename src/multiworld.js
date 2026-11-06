@@ -9,6 +9,13 @@ const SnapshotRenderer = require('./Sim/SnapshotRenderer');
 const CellStates = require('./Organism/Cell/CellStates');
 const Hyperparams = require('./Hyperparameters');
 const { SimMsg } = require('./Sim/SimProtocol');
+const { parseSettings, applySettings } = require('./Sim/UrlSettings');
+
+// Same URL settings as the evolution map (src/Sim/UrlSettings.js), applied to
+// every world - e.g. multiworld.html?food=7&mcp=1&drop=5 shows how much
+// worlds disagree under that setting.
+const URL_SETTINGS = parseSettings(new URLSearchParams(location.search));
+applySettings(URL_SETTINGS.values);
 
 const NEON = {
     empty: '#0E1318', food: '#2F7AB7', wall: '#FFFFFF', mouth: '#DEB14D',
@@ -227,6 +234,9 @@ function boot() {
     });
 
     $id('cores').textContent = cores;
+    $id('settings').textContent = 'settings: ' + (URL_SETTINGS.labels.length
+        ? URL_SETTINGS.labels.join(' · ') : 'default')
+        + (URL_SETTINGS.invalid.length ? ` (ignored: ${URL_SETTINGS.invalid.join(', ')})` : '');
     setInterval(refreshSummary, 500);
 }
 

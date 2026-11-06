@@ -96,7 +96,9 @@ class Organism {
             this.env.addOrganism(org);
             org.updateGrid();
             if (mutated) {
-                FossilRecord.addSpecies(org, this.species);
+                // Only a new species if the body moved far enough from this
+                // species' founder - see Stats/Speciation.js.
+                FossilRecord.speciate(org, this.species);
             }
             else {
                 org.species.addPop();

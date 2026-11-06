@@ -24,6 +24,12 @@ const Hyperparams = {
         this.instaKill = false;
         this.dontKillSameSpecies = false;
 
+        // A mutated child stays its parent's species while its body differs
+        // from the species founder by at most this fraction of cells
+        // (Stats/Speciation.js). Negative = upstream behaviour, where every
+        // anatomy mutation founds a new species.
+        this.speciesThreshold = 0.25;
+
         this.lookRange = 30;
         this.seeThroughSelf = false;
         this.evolveIndependentEyeDecisions = true;

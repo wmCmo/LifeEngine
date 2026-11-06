@@ -57,7 +57,41 @@ contingent. Invisible from a single world.
 
 ## Plan
 
-### 1. Real species clustering
+### 1. Real species clustering — done
+
+A mutated child stays its parent's species while its body differs from the
+species *founder* by at most `Hyperparams.speciesThreshold` (default 0.25, a
+quarter of the cells); otherwise it founds a new species descended from the
+old one. Negative threshold = upstream behaviour. `fossilize()` now keeps a
+small record of extinct species, so lineages survive — it used to drop every
+ancestor link at extinction, which made a tree impossible.
+
+Species naming moved off `Math.random` onto its own stream, so bookkeeping no
+longer consumes simulation randomness. Verified: same seed, thresholds -1 /
+0.15 / 0.25 / 0.4 all produce the identical population trace.
+
+Same seed, 400×300, 42k ticks:
+
+| threshold | extant | effective (inverse Simpson) | ≥1% of pop |
+|---|---|---|---|
+| legacy | 173 | 12.7 | 12 |
+| 0.25 | 117 | **7.4** | 8 |
+| 0.4 | 61 | 4.7 | 6 |
+
+The raw count stays high because each real species carries a cloud of fresh
+single-organism mutants. Use the effective number.
+
+The lineage of the dominant species now reaches the origin of life — tick 0,
+`m1 p2`, which is exactly `OriginOfLife()` — through seven ancestors. Under
+legacy the same species traced back two steps.
+
+Note: the dominant species there (`m2 p1 v1 k1`) carries a producer cell on a
+mover. With `moversCanProduce` off that cell makes no food; it survives only
+as cheap body mass (+lifespan, +health). Exactly what item 3 predicts.
+
+Run it: `SPECIES_THRESHOLD=0.25 node tools/bench.js 400 300 40000 2000`
+
+Original reasoning:
 
 Right now "species" means *any organism whose mutation succeeded* —
 `FossilRecord.addSpecies()` fires on every successful mutation and the name is

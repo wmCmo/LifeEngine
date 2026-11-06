@@ -5,3 +5,5 @@ dist/js/bundle.js.LICENSE.txt
 dist/js/*.js
 !dist/js/bundle.js.LICENSE.txt
 .claude/
+runs/
+prof/

@@ -1,6 +1,8 @@
 const CellStates = require("../Organism/Cell/CellStates");
 const SerializeHelper = require("../Utils/SerializeHelper");
 const Species = require("./Species");
+const Hyperparams = require("../Hyperparameters");
+const { genomeOf, genomeDistance, founderGenome } = require("./Speciation");
 
 const FossilRecord = {
     init: function(){
@@ -22,7 +24,27 @@ const FossilRecord = {
         var new_species = new Species(org.anatomy, ancestor, this.env.total_ticks);
         this.extant_species[new_species.name] = new_species;
         org.species = new_species;
+        this.species_created = (this.species_created || 0) + 1;
         return new_species;
+    },
+
+    // Called for a child whose anatomy mutated. It stays in its parent's
+    // species if its body is within Hyperparams.speciesThreshold of that
+    // species' founder; otherwise it founds a new species descended from it.
+    // A negative threshold restores upstream behaviour: every mutation is a
+    // new species.
+    speciate: function(org, parent_species) {
+        const threshold = Hyperparams.speciesThreshold;
+        if (threshold >= 0 && parent_species && !parent_species.extinct) {
+            const founder = founderGenome(parent_species);
+            if (founder !== null &&
+                genomeDistance(genomeOf(org.anatomy), founder) <= threshold) {
+                org.species = parent_species;
+                parent_species.addPop();
+                return parent_species;
+            }
+        }
+        return this.addSpecies(org, parent_species);
     },
 
     addSpeciesObj: function(species) {
@@ -56,11 +78,47 @@ const FossilRecord = {
         species.end_tick = this.env.total_ticks;
         species.ancestor = undefined; // garbage collect ancestors
         delete this.extant_species[species.name];
-        if (species.cumulative_pop >= this.min_discard) {
-            // TODO: store as extinct species
+
+        // Keep a small record so the lineage survives extinction - without
+        // it every ancestor link is cut the moment an ancestor dies out, and
+        // no tree can be drawn. With clustering on, species are few enough to
+        // keep all of them, which also keeps every lineage unbroken. In the
+        // legacy every-mutation-is-a-species mode that would be millions, so
+        // keep upstream's intended cutoff there.
+        const clustering = Hyperparams.speciesThreshold >= 0;
+        if (clustering || species.cumulative_pop >= this.min_discard) {
+            this.extinct_species[species.name] = {
+                name: species.name,
+                ancestor_name: species.ancestor_name,
+                start_tick: species.start_tick,
+                end_tick: species.end_tick,
+                cumulative_pop: species.cumulative_pop,
+                cell_counts: species.cell_counts,
+                extinct: true,
+            };
             return true;
         }
         return false;
+    },
+
+    // Any species, living or extinct, by name. Lineage walks go through this.
+    lookupSpecies(name) {
+        return this.extant_species[name] || this.extinct_species[name] || null;
+    },
+
+    // Number of recorded ancestors between a species and the root.
+    lineageDepth(species) {
+        let depth = 0;
+        let cur = species;
+        const seen = new Set();
+        while (cur && cur.ancestor_name && !seen.has(cur.name)) {
+            seen.add(cur.name);
+            const next = this.lookupSpecies(cur.ancestor_name);
+            if (!next) break;
+            depth++;
+            cur = next;
+        }
+        return depth;
     },
 
     resurrect: function(species) {
@@ -146,6 +204,7 @@ const FossilRecord = {
     clear_record() {
         this.extant_species = [];
         this.extinct_species = [];
+        this.species_created = 0;
         this.setData();
     },
 

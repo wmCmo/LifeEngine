@@ -12,100 +12,26 @@
 // trace exactly.
 
 const path = require('path');
+const { REPO, createWorld } = require('./harness');
 
-const REPO = path.resolve(__dirname, '..');
 const COLS = parseInt(process.argv[2] || '160');
 const ROWS = parseInt(process.argv[3] || '120');
 const WARM = parseInt(process.argv[4] || '20000');
 const N    = parseInt(process.argv[5] || '5000');
 
-// ---------------------------------------------------------------
-// Seeded RNG, installed before anything from the engine loads.
-// ---------------------------------------------------------------
-let _seed = (parseInt(process.env.SEED || '625341585') >>> 0) || 1;
-Math.random = function () {
-    _seed ^= _seed << 13; _seed >>>= 0;
-    _seed ^= _seed >> 17;
-    _seed ^= _seed << 5;  _seed >>>= 0;
-    return _seed / 4294967296;
-};
-
-// ---------------------------------------------------------------
-// Replace the two DOM-bound modules with inert stubs. A benchmark
-// wants zero render cost anyway.
-// ---------------------------------------------------------------
-function stubModule(relPath, exports) {
-    const full = require.resolve(path.join(REPO, relPath));
-    require.cache[full] = { id: full, filename: full, loaded: true, exports };
-}
-
-class StubRenderer {
-    constructor(_c, _id, cell_size) {
-        this.cell_size = cell_size;
-        this.canvas = { width: 800, height: 600 };
-        this.width = 800; this.height = 600;
-        this.cells_to_render = new Set();
-        this.cells_to_highlight = new Set();
-        this.highlighted_cells = new Set();
-    }
-    fillWindow() {}
-    fillShape(h, w) { this.height = h; this.width = w; }
-    clear() {} renderFullGrid() {} renderCell() {} renderOrganism() {}
-    renderCells() { this.cells_to_render.clear(); }
-    addToRender() {}
-    renderHighlights() { this.cells_to_highlight.clear(); }
-    highlightOrganism() {} highlightCell() {} renderCellHighlight() {} clearAllHighlights() {}
-}
-class StubController {
-    constructor() {}
-    setControlPanel() {} defineZoomControls() {} resetView() {}
-}
-stubModule('src/Rendering/Renderer', StubRenderer);
-stubModule('src/Controllers/EnvironmentController', StubController);
-
-const jq = new Proxy(function () {}, {
-    get(_t, p) {
-        if (p === 'height') return () => 600;
-        if (p === 'width')  return () => 800;
-        if (p === 'val')    return () => 0;
-        if (p === 'is')     return () => false;
-        if (p === 'text')   return () => '';
-        if (p === 'length') return 0;
-        if (p === Symbol.iterator) return function* () {};
-        if (p === 'then') return undefined;
-        return () => jq;
-    },
-    apply() { return jq; },
-    set() { return true; },
-});
-global.$ = () => jq;
-global.jQuery = global.$;
-global.document = {
-    getElementById: () => null, querySelector: () => null, querySelectorAll: () => [],
-    createElement: () => ({ getContext: () => ({}) }), addEventListener: () => {},
-};
-global.window = { addEventListener: () => {} };
-
-// ---------------------------------------------------------------
-const WorldConfig      = require(path.join(REPO, 'src/WorldConfig'));
-const WorldEnvironment = require(path.join(REPO, 'src/Environments/WorldEnvironment'));
-const Hyperparams      = require(path.join(REPO, 'src/Hyperparameters'));
-const FossilRecord     = require(path.join(REPO, 'src/Stats/FossilRecord'));
-
+const params = {};
 if (process.env.SPECIES_THRESHOLD !== undefined) {
-    Hyperparams.speciesThreshold = parseFloat(process.env.SPECIES_THRESHOLD);
+    params.speciesThreshold = parseFloat(process.env.SPECIES_THRESHOLD);
 }
-const PhyloRecord = require(path.join(REPO, 'src/Stats/PhyloRecord'));
-if (process.env.PHYLO) PhyloRecord.enabled = true;
 
-WorldConfig.headless = true;
-WorldConfig.auto_reset = true;
-WorldConfig.auto_pause = false;
-
-const fakeEngine = { fps: 60, last_fps: 60, running: false, start() {}, stop() {}, restart() {} };
-const env = new WorldEnvironment(fakeEngine, 5);
-env.resizeGridColRow(5, COLS, ROWS);
-env.reset(false);
+// Seeded RNG, DOM stubs and the world itself: see harness.js.
+const { env, Hyperparams, FossilRecord, PhyloRecord } = createWorld({
+    cols: COLS,
+    rows: ROWS,
+    seed: parseInt(process.env.SEED || '625341585'),
+    params,
+    phylo: !!process.env.PHYLO,
+});
 
 const squares = env.grid_map.cols * env.grid_map.rows;
 console.log(`grid      : ${env.grid_map.cols} x ${env.grid_map.rows} = ${squares.toLocaleString()} squares`);

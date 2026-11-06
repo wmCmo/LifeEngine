@@ -7,6 +7,11 @@ const Brain = require("./Perception/Brain");
 const FossilRecord = require("../Stats/FossilRecord");
 const SerializeHelper = require("../Utils/SerializeHelper");
 
+// With a lifespanExponent other than 1, a body this size lives exactly as
+// long as it did before; smaller ones live relatively longer, bigger ones
+// relatively shorter. 5 is about the typical body in a default world.
+const LIFESPAN_ANCHOR = 5;
+
 class Organism {
     constructor(col, row, env, parent=null) {
         this.c = col;
@@ -46,7 +51,23 @@ class Organism {
     }
 
     lifespan() {
-        return this.anatomy.cells.length * Hyperparams.lifespanMultiplier;
+        const n = this.anatomy.cells.length;
+        const e = Hyperparams.lifespanExponent;
+        if (e === 1) return n * Hyperparams.lifespanMultiplier;   // upstream, exactly
+        return Hyperparams.lifespanMultiplier * LIFESPAN_ANCHOR * Math.pow(n / LIFESPAN_ANCHOR, e);
+    }
+
+    // Metabolism (Hyperparams.upkeepScale > 0). Returns true if this tick's
+    // upkeep starved the organism.
+    payUpkeep() {
+        const cost = Hyperparams.upkeepScale * Math.pow(this.anatomy.cells.length, Hyperparams.upkeepExponent);
+        this.food_collected -= cost;
+        if (this.food_collected < -cost * Hyperparams.starveTicks) {
+            if (this.env) this.env.starved = (this.env.starved || 0) + 1;
+            this.die();
+            return true;
+        }
+        return false;
     }
 
     maxHealth() {
@@ -290,6 +311,9 @@ class Organism {
     }
 
     die() {
+        // Bookkeeping for experiments: how many die, and (payUpkeep) how
+        // many of those starved.
+        if (this.living && this.env) this.env.deaths = (this.env.deaths || 0) + 1;
         for (var cell of this.anatomy.cells) {
             var real_c = this.c + cell.rotatedCol(this.rotation);
             var real_r = this.r + cell.rotatedRow(this.rotation);
@@ -311,6 +335,10 @@ class Organism {
         this.lifetime++;
         if (this.lifetime > this.lifespan()) {
             this.die();
+            return this.living;
+        }
+        // Skipped entirely when off, so the original game runs unchanged.
+        if (Hyperparams.upkeepScale > 0 && this.payUpkeep()) {
             return this.living;
         }
         if (this.food_collected >= this.foodNeeded()) {

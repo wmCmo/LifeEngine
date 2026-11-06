@@ -17,13 +17,18 @@ const seed = spec.seed || 1;
 const params = spec.params || {};
 const max_secs = spec.max_secs || 900;
 
-const { env, FossilRecord, EraRecord, CellStates } = createWorld({ cols, rows, seed, params });
+const w = createWorld({ cols, rows, seed, params });
+const { env, FossilRecord, EraRecord, CellStates } = w;
 const BODY = CellStates.living.map(s => s.name);
 const late_from = Math.floor(ticks / 2);
 
 // Body size and composition, sampled every 500 ticks over the late half.
-const late = { n: 0, orgs: 0, cells: 0, comp: {} };
+// `vestigial` counts movers carrying a producer cell while movers can't
+// produce: a cell that does nothing but add body mass. Its prevalence is the
+// direct test of "cells are free, so useless organs survive".
+const late = { n: 0, orgs: 0, cells: 0, comp: {}, movers: 0, vestigial: 0 };
 for (const b of BODY) late.comp[b] = 0;
+let deaths_at_half = 0, starved_at_half = 0;
 
 const t0 = Date.now();
 let done = 0;
@@ -31,14 +36,28 @@ let timed_out = false;
 for (let t = 1; t <= ticks; t++) {
     env.update();
     done = t;
+    if (t === late_from) {
+        deaths_at_half = env.deaths || 0;
+        starved_at_half = env.starved || 0;
+    }
     if (t >= late_from && t % 500 === 0) {
         const orgs = env.organisms;
+        const movers_produce = !!w.Hyperparams.moversCanProduce;
         late.n++;
         late.orgs += orgs.length;
         for (let i = 0; i < orgs.length; i++) {
-            const cells = orgs[i].anatomy.cells;
+            const a = orgs[i].anatomy;
+            const cells = a.cells;
             late.cells += cells.length;
-            for (let j = 0; j < cells.length; j++) late.comp[cells[j].state.name]++;
+            let hasProducer = false;
+            for (let j = 0; j < cells.length; j++) {
+                late.comp[cells[j].state.name]++;
+                if (cells[j].state.name === 'producer') hasProducer = true;
+            }
+            if (a.is_mover) {
+                late.movers++;
+                if (hasProducer && !movers_produce) late.vestigial++;
+            }
         }
     }
     // Some settings blow the population up and crawl; cap the wall clock so
@@ -92,6 +111,11 @@ const out = {
     mass_extinctions: events.filter(e => e.type === 'mass extinction').length,
     crashes: events.filter(e => e.type !== 'mass extinction').length,
     species_founded: FossilRecord.species_created || 0,
+    vestigial_share: late.movers ? +(late.vestigial / late.movers).toFixed(3) : 0,
+    // Late-half deaths, and the share of them that were starvation.
+    deaths_late: (env.deaths || 0) - deaths_at_half,
+    starved_share_late: ((env.deaths || 0) - deaths_at_half) > 0
+        ? +(((env.starved || 0) - starved_at_half) / ((env.deaths || 0) - deaths_at_half)).toFixed(3) : 0,
     trace: `${env.organisms.length} ${cells_end}`,
 };
 process.stdout.write(JSON.stringify(out) + '\n');

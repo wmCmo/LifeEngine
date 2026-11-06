@@ -70,6 +70,17 @@ const PLANS = {
         ['moversCanProduce', 'mcp',  [false, true]],
         ['foodDropProb',     'drop', [0, 5]],
     ],
+    // Metabolic upkeep: a wide log range first, to find where it starts to
+    // matter and where everything starves.
+    'upkeep-cal': [
+        ['upkeepScale', 'upkeep', [0, 0.0002, 0.0005, 0.001, 0.002, 0.005, 0.01, 0.02]],
+    ],
+    // The range upkeep-cal found to matter (0.0005-0.005; 0.01 kills half the
+    // worlds, 0.02 all), crossed with Kleiber lifespan scaling.
+    metabolism: [
+        ['upkeepScale',      'upkeep', [0, 0.0005, 0.001, 0.002, 0.005]],
+        ['lifespanExponent', 'lexp',   [1, 0.25]],
+    ],
 };
 
 let configs;
@@ -215,6 +226,8 @@ function summarise() {
             eras: avg(ok.map(r => r.eras)),
             ruler_plans: avg(ok.map(r => r.ruler_plans)),
             mass_extinctions: avg(ok.map(r => r.mass_extinctions)),
+            vestigial: avg(ok.map(r => r.vestigial_share || 0)),
+            starved: avg(ok.map(r => r.starved_share_late || 0)),
             tps: avg(ok.map(r => r.tps)),
         };
     }
@@ -288,6 +301,9 @@ function summarise() {
             ['eyes %', s => `${Math.round(s.eye * 100)}`],
             ['distinct ruling body plans', s => s.ruler_plans.toFixed(1)],
             ['seeds disagree', s => s.divergence.toFixed(2)],
+            ['movers carrying a useless producer cell %', s => `${Math.round(s.vestigial * 100)}`],
+            ['deaths by starvation %', s => `${Math.round(s.starved * 100)}`],
+            ['population', s => `${Math.round(s.pop)}`],
         ];
         const head = `| ${rowF[1]} | ${colCombos.map(c => c.map((v, i) => lbl(colFs[i], v)).join(' ')).join(' | ')} |`;
         const sep = `|---|${colCombos.map(() => '---').join('|')}|`;

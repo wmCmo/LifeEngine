@@ -38,6 +38,23 @@ const Hyperparams = {
 
         this.extraMoverFoodCost = 0;
 
+        // Metabolism. upkeepScale 0 = off: the original game, where a cell
+        // costs food once, to be born, and nothing to keep. Above 0, every
+        // organism pays upkeepScale * cells^upkeepExponent food per tick -
+        // Kleiber's law: a bigger body costs more in total but less per cell -
+        // and starves once it is in debt by more than starveTicks ticks' worth
+        // of upkeep. Newborns start with no food, so that allowance is what
+        // lets them live long enough to find some.
+        this.upkeepScale = 0;
+        this.upkeepExponent = 0.75;
+        this.starveTicks = 300;
+
+        // Lifespan = lifespanMultiplier * cells^lifespanExponent, anchored so
+        // a 5-cell body lives exactly as long either way. 1 = upstream (linear,
+        // so size buys longevity at no discount). 0.25 = Kleiber: bigger still
+        // lives longer, with steep diminishing returns.
+        this.lifespanExponent = 1;
+
         this.maxOrganisms = -1;
     },
 

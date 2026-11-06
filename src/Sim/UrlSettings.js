@@ -22,6 +22,11 @@ const SETTINGS = [
     ['sym',       'mutationSymmetryChance', 'num',  0, 100,   v => `symmetry ${v}`],
     ['look',      'lookRange',              'int',  1, 500,   v => `look range ${v}`],
     ['species',   'speciesThreshold',       'num', -1, 1,     v => `species threshold ${v}`],
+    // Metabolism (off at upkeep 0). See Hyperparameters.js.
+    ['upkeep',    'upkeepScale',            'num',  0, 1,     v => v > 0 ? `upkeep ${v}` : 'no upkeep'],
+    ['uexp',      'upkeepExponent',         'num',  0, 2,     v => `upkeep exponent ${v}`],
+    ['starve',    'starveTicks',            'int',  1, 100000, v => `starve after ${v} ticks`],
+    ['lexp',      'lifespanExponent',       'num',  0, 2,     v => `lifespan exponent ${v}`],
 ];
 
 // From the two sweeps (docs/sweeps). Labels say why each is interesting.

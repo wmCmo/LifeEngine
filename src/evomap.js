@@ -116,6 +116,8 @@ function boot() {
     $id('e-drop').value = cur.drop;
     $id('e-life').value = cur.life;
     $id('e-movercost').value = cur.movercost;
+    $id('e-upkeep').value = cur.upkeep;
+    $id('e-lexp').value = cur.lexp;
     $id('e-mcp').checked = !!cur.mcp;
     $id('e-kin').checked = !!cur.kin;
     $id('edit').addEventListener('click', () => {
@@ -130,6 +132,8 @@ function boot() {
             drop: parseFloat($id('e-drop').value),
             life: parseFloat($id('e-life').value),
             movercost: parseInt($id('e-movercost').value, 10),
+            upkeep: parseFloat($id('e-upkeep').value),
+            lexp: parseFloat($id('e-lexp').value),
             mcp: $id('e-mcp').checked,
             kin: $id('e-kin').checked,
         });

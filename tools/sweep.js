@@ -35,6 +35,7 @@ const ROWS = parseInt(opt('rows', '220'));
 const JOBS = parseInt(opt('jobs', String(Math.max(1, os.cpus().length - 2))));
 const ONLY = opt('only', null);
 const MAX_SECS = parseInt(opt('max-secs', '900'));
+const PLAN = opt('plan', 'oat');
 
 const SEEDS = [11, 22, 33, 44, 55, 66, 77, 88].slice(0, NSEEDS);
 
@@ -57,9 +58,46 @@ const DIMENSIONS = [
     ['lookRange',              [10].map(v => [v, { lookRange: v }])],
 ];
 
-let configs = [{ name: 'baseline', params: {} }];
-for (const [dim, values] of DIMENSIONS) {
-    for (const [v, params] of values) configs.push({ name: `${dim}=${v}`, params });
+// --plan energy: every combination of the three controls that changed the
+// most in the one-at-a-time pass (docs/sweeps/sweep-1.md). The question is
+// whether they interact - e.g. does more food help differently once movers
+// can produce? A flat list of combinations hides that; the summary pivots it.
+// First value of each factor is its default, so the all-defaults combination
+// is the baseline.
+const PLANS = {
+    energy: [
+        ['foodProdProb',     'food', [5, 7, 10, 14]],
+        ['moversCanProduce', 'mcp',  [false, true]],
+        ['foodDropProb',     'drop', [0, 5]],
+    ],
+};
+
+let configs;
+let FACTORS = null;
+if (PLAN === 'oat') {
+    configs = [{ name: 'baseline', params: {} }];
+    for (const [dim, values] of DIMENSIONS) {
+        for (const [v, params] of values) configs.push({ name: `${dim}=${v}`, params });
+    }
+} else if (PLANS[PLAN]) {
+    FACTORS = PLANS[PLAN];
+    configs = [{ name: 'baseline', params: {} }];
+    const combos = FACTORS.reduce((acc, [, , values]) =>
+        acc.flatMap(prefix => values.map(v => [...prefix, v])), [[]]);
+    for (const combo of combos) {
+        if (combo.every((v, i) => v === FACTORS[i][2][0])) {
+            // all defaults: that's the baseline, already first
+            configs[0].params = Object.fromEntries(combo.map((v, i) => [FACTORS[i][0], v]));
+            continue;
+        }
+        configs.push({
+            name: combo.map((v, i) => `${FACTORS[i][1]}=${v === true ? 1 : v === false ? 0 : v}`).join(' '),
+            params: Object.fromEntries(combo.map((v, i) => [FACTORS[i][0], v])),
+        });
+    }
+} else {
+    console.error(`unknown plan "${PLAN}" (have: oat, ${Object.keys(PLANS).join(', ')})`);
+    process.exit(1);
 }
 if (ONLY) configs = configs.filter(c => c.name === 'baseline' || c.name.includes(ONLY));
 
@@ -138,6 +176,11 @@ function summarise() {
     const BODY = ['mouth', 'producer', 'mover', 'killer', 'armor', 'eye'];
     const GUILDS = ['plant', 'armed_plant', 'grazer', 'predator'];
     const avg = a => a.length ? a.reduce((x, y) => x + y, 0) / a.length : 0;
+    const sd = a => {
+        if (a.length < 2) return 0;
+        const m = avg(a);
+        return Math.sqrt(a.reduce((s, x) => s + (x - m) * (x - m), 0) / (a.length - 1));
+    };
 
     const byConfig = new Map();
     for (const r of results) {
@@ -162,7 +205,7 @@ function summarise() {
             failed: all.length - ok.length,
             survived: ok.filter(r => r.resets === 0 && r.alive_end && !r.timed_out).length,
             timed_out: ok.filter(r => r.timed_out).length,
-            eff_mean: avg(eff), eff_min: Math.min(...eff), eff_max: Math.max(...eff),
+            eff_mean: avg(eff), eff_min: Math.min(...eff), eff_max: Math.max(...eff), eff_sd: sd(eff),
             cells_per_org: avg(ok.map(r => r.cells_per_org_late)),
             pop: avg(ok.map(r => r.pop_late)),
             eye: avg(ok.map(r => r.eye_late)),
@@ -225,8 +268,42 @@ function summarise() {
         '',
     ].join('\n');
 
-    fs.writeFileSync(path.join(OUT, 'summary.md'), md);
+    // Factorial plans: one pivot per metric, rows = the first factor, columns
+    // = combinations of the rest. Interactions show up as rows that move
+    // differently from column to column.
+    let pivots = '';
+    if (FACTORS) {
+        const [rowF, ...colFs] = FACTORS;
+        const colCombos = colFs.reduce((acc, [, , vals]) =>
+            acc.flatMap(p => vals.map(v => [...p, v])), [[]]);
+        const lbl = (f, v) => `${f[1]}=${v === true ? 1 : v === false ? 0 : v}`;
+        const find = (rv, combo) => summaries.find(s =>
+            s.params[rowF[0]] === rv && colFs.every((f, i) => s.params[f[0]] === combo[i]));
+        const METRICS = [
+            ['survived (of seeds)', s => `${s.survived}/${s.runs}`],
+            ['effective species, mean ± sd', s => `${s.eff_mean.toFixed(1)} ± ${s.eff_sd.toFixed(1)}`],
+            ['body size (cells/org)', s => s.cells_per_org.toFixed(2)],
+            ['predators %', s => `${Math.round(s.guild.predator * 100)}`],
+            ['plants (incl. armed) %', s => `${Math.round((s.guild.plant + s.guild.armed_plant) * 100)}`],
+            ['eyes %', s => `${Math.round(s.eye * 100)}`],
+            ['distinct ruling body plans', s => s.ruler_plans.toFixed(1)],
+            ['seeds disagree', s => s.divergence.toFixed(2)],
+        ];
+        const head = `| ${rowF[1]} | ${colCombos.map(c => c.map((v, i) => lbl(colFs[i], v)).join(' ')).join(' | ')} |`;
+        const sep = `|---|${colCombos.map(() => '---').join('|')}|`;
+        const blocks = METRICS.map(([title, fmtCell]) => [
+            `### ${title}`, '', head, sep,
+            ...rowF[2].map(rv => `| ${rv} | ${colCombos.map(c => {
+                const s = find(rv, c);
+                return s && s.runs ? fmtCell(s) : '—';
+            }).join(' | ')} |`),
+            '',
+        ].join('\n'));
+        pivots = '\n## Pivots\n\n' + blocks.join('\n');
+    }
+
+    fs.writeFileSync(path.join(OUT, 'summary.md'), md + pivots);
     fs.writeFileSync(path.join(OUT, 'summary.json'), JSON.stringify(summaries, null, 2));
-    console.log('\n' + md);
+    console.log('\n' + md + pivots);
     console.log(`done in ${((Date.now() - started) / 60000).toFixed(1)} min -> ${path.relative(REPO, OUT)}`);
 }

@@ -380,12 +380,15 @@ class EvoMap {
         if (h.kind === 'badge' || h.kind === 'portrait' || h.kind === 'line') {
             if (this.hiddenChildren(h.node) > 0 || h.node.expanded) this.toggle(h.node);
         }
+        // Picking a species (to save it or drop copies) rides along with the
+        // same click, so expanding works exactly as before.
+        if (this.onSelect) this.onSelect(h.node);
     }
 
     // ---- drawing --------------------------------------------------------
 
     requestDraw() {
-        if (this.pending) return;
+        if (this.pending || this.canvas.hidden) return;
         this.pending = true;
         requestAnimationFrame(() => { this.pending = false; this.draw(); });
     }

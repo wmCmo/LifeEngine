@@ -27,6 +27,9 @@ const SimMsg = {
     CLEAR_WALLS:  'clear_walls',
     SERIALIZE:    'serialize',     // -> SERIALIZED
     LOAD:         'load',
+    SAVE_WORLD:   'save_world',    // -> WORLD_SAVED: original world format + map history
+    LOAD_WORLD:   'load_world',    // file text -> WORLD_LOADED (or LOAD_FAILED)
+    SPECIES_ORG:  'species_org',   // a living member of a species -> ORGANISM
 
     // --- worker -> main ---
     READY:        'ready',
@@ -36,7 +39,10 @@ const SimMsg = {
     SERIALIZED:   'serialized',
     EXTINCT:      'extinct',
     PHYLO:        'phylo',         // incremental phylogeny + eras, for the evolution map
-    PAUSED:       'paused',        // worker paused itself (auto-pause on extinction)
+    PAUSED:       'paused',
+    WORLD_SAVED:  'world_saved',
+    WORLD_LOADED: 'world_loaded',
+    LOAD_FAILED:  'load_failed',        // worker paused itself (auto-pause on extinction)
 };
 
 module.exports = { SimMsg };

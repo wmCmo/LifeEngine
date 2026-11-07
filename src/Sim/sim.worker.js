@@ -19,6 +19,7 @@ const Perlin = require('../Utils/Perlin');
 const PhyloRecord = require('../Stats/PhyloRecord');
 const EraRecord = require('../Stats/EraRecord');
 const { SimMsg } = require('./SimProtocol');
+const WorldSave = require('./WorldSave');
 
 // Time inside the tick loop before yielding to handle messages. Long enough
 // that yield overhead is noise, short enough that pause/reset feel instant.
@@ -253,7 +254,23 @@ function dropOrganismRaw(raw, col, row) {
     org.loadRaw(raw);
     org.c = col;
     org.r = row;
+    // A file saved from a live organism carries its age, wounds, food and id;
+    // a dropped copy starts fresh.
+    org.id = undefined;
+    org.lifetime = 0;
+    org.damage = 0;
+    org.food_collected = 0;
+    org.living = true;
     if (!org.isClear(col, row)) return false;
+    // A copy of a living species joins it, so the map shows it as more of
+    // the same species rather than a new one.
+    const living = raw.species_name && FossilRecord.extant_species[raw.species_name];
+    if (!org.species && living) {
+        org.species = living;
+        env.addOrganism(org);
+        living.addPop();
+        return true;
+    }
     if (!org.species) {
         org.species = new Species(org.anatomy, null, env.total_ticks);
     }
@@ -402,7 +419,7 @@ onmessage = function (e) {
 
         case SimMsg.SELECT_AT: {
             const org = organismAt(msg.c, msg.r, msg.brush);
-            postMessage({ type: SimMsg.ORGANISM, organism: org ? org.serialize() : null });
+            postMessage({ type: SimMsg.ORGANISM, organism: org ? org.serialize() : null, token: msg.token });
             break;
         }
 
@@ -435,6 +452,30 @@ onmessage = function (e) {
 
         case SimMsg.SERIALIZE:
             postMessage({ type: SimMsg.SERIALIZED, env: env.serialize(), token: msg.token });
+            break;
+
+        case SimMsg.SAVE_WORLD:
+            postMessage({ type: SimMsg.WORLD_SAVED, text: WorldSave.buildSave(env, msg.meta), ticks: env.total_ticks });
+            break;
+
+        case SimMsg.LOAD_WORLD: {
+            const was_running = running;
+            running = false;
+            try {
+                const info = WorldSave.loadSave(env, msg.text);
+                postMessage({ type: SimMsg.READY, cols: env.grid_map.cols, rows: env.grid_map.rows });
+                postMessage({ type: SimMsg.WORLD_LOADED, info });
+                sendSnapshot();
+                sendStats();
+            } catch (err) {
+                postMessage({ type: SimMsg.LOAD_FAILED, error: String(err && err.message || err) });
+            }
+            if (was_running) { running = true; last_slice_end = 0; scheduleSlice(); }
+            break;
+        }
+
+        case SimMsg.SPECIES_ORG:
+            postMessage({ type: SimMsg.ORGANISM, organism: WorldSave.speciesOrganism(env, msg.name), species: msg.name, token: msg.token });
             break;
 
         case SimMsg.LOAD:

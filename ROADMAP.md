@@ -249,6 +249,28 @@ Next: long runs on that preset, and only then connective tissue (organisms
 fusing into a bigger one). Without a reason to be big, fusion would only make a
 bigger target.
 
+### 2d. The map as the main app — world window, tools, saving: done
+
+The original game's controls, sorted by where they belong (conversation of
+7 Nov 2026). Done so far, all in `evomap.html`:
+
+- **World window** (W, or click the small world): full screen, wheel zoom,
+  middle-drag pan, and the original tools - food, walls, kill, select, drop
+  organism, brush size, random/clear walls (keys 1-6).
+- **Save / load world** (`src/Sim/WorldSave.js`): the original game's world
+  format plus a `lab` section with the map history - phylogeny, eras,
+  extinction events, extinct species, founder bodies. Saves open in the
+  original game; the original game's saves open here (history starts at the
+  load). Round trip checked by `node tools/test-save.js`.
+- **Save organism**: from the world (select) or from the map (click a species:
+  a living member with its brain, or the founder's body if it's extinct), in
+  the original organism format. Load organism, drop copies.
+
+Still to place: the remaining evolution controls in the settings editor
+(rotation, max organisms, mutation rates and types, eyes, one-touch kill, food
+blocks births), grid size, reset-or-pause on extinction. Left in `play.html`:
+the organism and brain editor, colour schemes, statistics charts.
+
 ### 4. Terrain and climate
 
 `src/Utils/Perlin.js` is sitting there unused, which is a strong hint about

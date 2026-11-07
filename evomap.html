@@ -11,6 +11,8 @@
     font: 11px/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
   #map { position: fixed; inset: 0; width: 100vw; height: 100vh; display: block; cursor: grab; }
   #map:active { cursor: grabbing; }
+  #world { position: fixed; inset: 0; width: 100vw; height: 100vh; display: block; cursor: grab; background: #070b0f; }
+  #world[hidden] { display: none; }
 
   .panel { position: fixed; background: rgba(9,17,23,0.86); border: 1px solid rgba(255,255,255,0.07);
     border-radius: 8px; padding: 12px 14px; backdrop-filter: blur(6px); }
@@ -45,7 +47,26 @@
   #editor .hint { color: #6c7d93; }
   button#copy.done { background: #3FE07A; color: #08121a; border-color: #3FE07A; }
 
-  #inset { bottom: 40px; left: 14px; padding: 8px; }
+  #inset { bottom: 40px; left: 14px; padding: 8px; cursor: pointer; }
+  #inset:hover { border-color: rgba(92,200,255,0.5); }
+
+  #tools { bottom: 14px; left: 50%; transform: translateX(-50%); display: flex; gap: 6px; align-items: center; flex-wrap: wrap; justify-content: center; max-width: calc(100vw - 28px); }
+  #tools[hidden], #picked[hidden] { display: none; }
+  #tools .sep { width: 1px; align-self: stretch; background: rgba(255,255,255,0.1); margin: 0 4px; }
+  #tools button[data-tool] { min-width: 52px; }
+  #tools label { color: #8a9bb2; display: flex; align-items: center; gap: 6px; }
+  #tools input[type=range] { width: 80px; }
+  #picked { bottom: 14px; left: 14px; display: flex; gap: 12px; align-items: center; min-width: 300px; }
+  body.mapview #picked { bottom: 40px; left: 290px; }
+  @media (max-width: 1100px) { #picked { bottom: 96px; } body.mapview #picked { bottom: 300px; left: 14px; } }
+  #picked canvas { image-rendering: pixelated; background: #0E1318; border-radius: 4px; }
+  #picked .what { flex: 1; }
+  #picked .what b { color: #fff; }
+  #picked .what div { color: #8a9bb2; }
+  #picked .x { color: #46607a; cursor: pointer; align-self: flex-start; }
+  #toast { position: fixed; top: 14px; left: 50%; transform: translateX(-50%); background: rgba(9,17,23,0.95);
+    border: 1px solid rgba(255,255,255,0.12); border-radius: 6px; padding: 8px 14px; display: none; z-index: 20; }
+  #toast.bad { color: #ff6b88; }
   #board { display: block; width: 240px; height: auto; image-rendering: pixelated; border-radius: 4px; background: #0E1318; }
   .cap { color: #6c7d93; margin-top: 5px; display: flex; justify-content: space-between; }
 
@@ -66,6 +87,7 @@
 <body>
 
 <canvas id="map"></canvas>
+<canvas id="world" hidden></canvas>
 
 <div class="panel" id="top">
   <h1>EVOLUTION MAP <a href="index.html" style="font-size:11px;font-weight:400;letter-spacing:0;color:#5CC8FF;margin-left:8px">what is this?</a></h1>
@@ -86,6 +108,13 @@
     <select id="preset" title="settings found by the parameter sweeps"></select>
     <button id="edit" title="change settings">settings</button>
     <button id="copy" title="copy a link to this exact world - seed and settings">copy link</button>
+  </div>
+  <div class="row">
+    <button id="view" title="switch between the map and the live world (W)">open world</button>
+    <button id="save" title="download this world, with its whole history, as a file">save world</button>
+    <button id="load" title="open a saved world - from here or from the original game">load world</button>
+    <input type="file" id="file-world" accept=".json,application/json" hidden>
+    <input type="file" id="file-org" accept=".json,application/json" hidden>
   </div>
   <div id="active"></div>
   <div id="editor" hidden>
@@ -119,10 +148,42 @@
   </table>
 </div>
 
-<div class="panel" id="inset">
+<div class="panel" id="inset" title="open the live world (W)">
   <canvas id="board" width="300" height="220"></canvas>
   <div class="cap"><span>live world <span id="grid"></span></span><span>seed <span id="seed"></span></span></div>
 </div>
+
+<div class="panel" id="tools" hidden>
+  <button data-tool="move" title="drag to pan (1) - middle-drag pans with any tool">move</button>
+  <button data-tool="food" title="paint food; right-click removes (2)">food</button>
+  <button data-tool="wall" title="paint walls; right-click removes (3)">wall</button>
+  <button data-tool="kill" title="kill organisms under the brush (4)">kill</button>
+  <button data-tool="select" title="pick an organism to inspect or save (5)">select</button>
+  <button data-tool="drop" title="drop a copy of the picked organism (6)">drop</button>
+  <label title="brush size for food, walls and kill">brush <input id="brush" type="range" min="0" max="15" value="2"></label>
+  <span class="sep"></span>
+  <button id="rwalls" title="generate random walls">random walls</button>
+  <button id="cwalls" title="remove every wall">clear walls</button>
+  <button id="lorg" title="open an organism file, from here or the original game">load organism</button>
+  <button id="wfit" title="fit the world (Z)">fit</button>
+  <span class="sep"></span>
+  <button id="back" title="back to the map (W)">map</button>
+</div>
+
+<div class="panel" id="picked" hidden>
+  <canvas id="picked-art" width="60" height="60"></canvas>
+  <div class="what">
+    <b id="picked-name"></b>
+    <div id="picked-info"></div>
+    <div class="row">
+      <button id="picked-save" title="download as an organism file - it opens in the original game too">save organism</button>
+      <button id="picked-drop" title="switch to the drop tool and place copies in the world">drop copies</button>
+    </div>
+  </div>
+  <span class="x" id="picked-close" title="close">&times;</span>
+</div>
+
+<div id="toast"></div>
 
 <button id="help-btn" title="help (?)">?</button>
 <div class="panel" id="help" title="click to hide">
@@ -130,7 +191,8 @@
   Era rulers and their ancestry are shown &mdash; click <b>+N</b> to reveal more.<br><br>
   <b>drag</b> pan &middot; <b>wheel</b> zoom &middot; <b>shift+wheel</b> zoom time only<br>
   <b>space</b> run/pause &middot; <b>F</b> follow &middot; <b>Z</b> fit<br>
-  hover a species for its history<br><br>
+  hover a species for its history, click it to pick it<br>
+  <b>W</b> live world: wheel zoom, middle-drag pan, tools 1&ndash;6<br><br>
   Settings live in the link, e.g. <b>?seed=42&amp;food=7&amp;mcp=1&amp;drop=5</b>.
   Also: life, movercost, kin, insta, block, mut, sym, look, species, upkeep, lexp, swallow, gape.
 </div>

@@ -9,7 +9,7 @@ const Hyperparams = require('./Hyperparameters');
 const { SimMsg } = require('./Sim/SimProtocol');
 const { EvoMap, GUILD_COLOR, GUILD_LABEL } = require('./Map/EvoMap');
 const { WorldView, TOOLS } = require('./Map/WorldView');
-const { PRESETS, parseSettings, applySettings, currentSettings, settingsQuery, matchPreset } = require('./Sim/UrlSettings');
+const { SETTINGS: SETTING_LIST, isAlias, DEFAULTS, PRESETS, parseSettings, applySettings, currentSettings, settingsQuery, matchPreset } = require('./Sim/UrlSettings');
 
 const NEON = {
     empty: '#0E1318', food: '#2F7AB7', wall: '#FFFFFF', mouth: '#DEB14D',
@@ -19,8 +19,13 @@ for (const s of CellStates.all) s.color = NEON[s.name] || 'black';
 CellStates.eye.slit_color = '#0E1318';
 
 const params = new URLSearchParams(location.search);
-const COLS = parseInt(params.get('cols') || '300');
-const ROWS = parseInt(params.get('rows') || '220');
+// The world itself, not its rules: board size, and whether to pause rather
+// than restart when everything dies.
+const DEFAULT_COLS = 300, DEFAULT_ROWS = 220;
+const clampSize = (v, d) => { const n = parseInt(v, 10); return Number.isFinite(n) ? Math.min(2000, Math.max(20, n)) : d; };
+const COLS = clampSize(params.get('cols'), DEFAULT_COLS);
+const ROWS = clampSize(params.get('rows'), DEFAULT_ROWS);
+const HALT = params.get('halt') === '1';
 const SEED = params.has('seed') ? parseInt(params.get('seed')) : (Date.now() & 0x7fffffff);
 
 // Settings from the URL go into Hyperparams before the worker is created -
@@ -31,19 +36,22 @@ let LOADED = null;     // {name, ticks} once a world has been loaded from a file
 
 // Settings change the rules, so they start a new world - on the same seed, so
 // two settings can be compared from the same start.
-function gotoSettings(values) {
-    const q = settingsQuery(values, SEED);
-    const keep = new URLSearchParams(q);
-    if (params.has('cols')) keep.set('cols', params.get('cols'));
-    if (params.has('rows')) keep.set('rows', params.get('rows'));
-    location.search = keep.toString();
+function worldParams(q, w) {
+    if (w.cols !== DEFAULT_COLS) q.set('cols', String(w.cols));
+    if (w.rows !== DEFAULT_ROWS) q.set('rows', String(w.rows));
+    if (w.halt) q.set('halt', '1');
+    return q;
+}
+
+function gotoSettings(values, w) {
+    const q = worldParams(new URLSearchParams(settingsQuery(values, SEED)), w || { cols: COLS, rows: ROWS, halt: HALT });
+    location.search = q.toString();
 }
 
 function shareLink() {
     // A loaded world isn't its seed any more - share its settings only.
-    const q = new URLSearchParams(settingsQuery(SETTINGS.values, LOADED ? null : SEED));
-    if (params.has('cols')) q.set('cols', params.get('cols'));
-    if (params.has('rows')) q.set('rows', params.get('rows'));
+    const q = worldParams(new URLSearchParams(settingsQuery(SETTINGS.values, LOADED ? null : SEED)),
+        { cols: COLS, rows: ROWS, halt: HALT });
     return `${location.origin}${location.pathname}?${q.toString()}`;
 }
 
@@ -99,7 +107,15 @@ function jsonParams() {
 
 function speed() { return parseInt($id('speed').value); }
 
+let halted = false;   // paused because everything died ("pause when everything dies")
+
 function setRunning(v) {
+    // Running again after a die-off starts over from one organism, the same
+    // as an automatic restart would have.
+    if (v && halted) {
+        halted = false;   // the die-off was already counted when it happened
+        worker.postMessage({ type: SimMsg.RESET });
+    }
     running = v;
     worker.postMessage(v ? { type: SimMsg.START, fps: speed() } : { type: SimMsg.STOP });
     $id('run').textContent = v ? 'pause' : 'run';
@@ -138,16 +154,81 @@ function refreshSettingsUI() {
     if (matched) preset.value = matched;
 
     const cur = currentSettings();
-    $id('e-food').value = cur.food;
-    $id('e-drop').value = cur.drop;
-    $id('e-life').value = cur.life;
-    $id('e-movercost').value = cur.movercost;
-    $id('e-upkeep').value = cur.upkeep;
-    $id('e-lexp').value = cur.lexp;
-    $id('e-swallow').value = cur.swallow;
-    $id('e-gape').value = cur.gape;
-    $id('e-mcp').checked = !!cur.mcp;
-    $id('e-kin').checked = !!cur.kin;
+    for (const s of SETTING_LIST) {
+        if (isAlias(s)) continue;
+        const el = $id('e-' + s[0]);
+        if (!el) continue;
+        if (s[2] === 'bool') el.checked = !!cur[s[0]];
+        else el.value = cur[s[0]];
+    }
+    markChanged();
+}
+
+// The settings panel, built from the list in UrlSettings.js so a setting
+// added there appears here too. One collapsible group per kind of rule;
+// a group opens by itself if anything in it differs from the default.
+function buildEditor() {
+    const groups = new Map();
+    for (const s of SETTING_LIST) {
+        const ed = s[6];
+        if (!ed || ed.alias) continue;
+        if (!groups.has(ed.group)) groups.set(ed.group, []);
+        groups.get(ed.group).push(s);
+    }
+    const cur = currentSettings();
+    let html = '';
+    for (const [name, list] of groups) {
+        const changed = list.some(s => cur[s[0]] !== DEFAULTS[s[0]]);
+        html += `<details class="grp" data-group="${name}"${changed || name === 'Food' ? ' open' : ''}><summary>${name}<span class="mark"></span></summary><div class="grid">`;
+        for (const s of list) {
+            const [key, , type, min, max] = s;
+            const ed = s[6];
+            const tip = (ed.hint ? ed.hint + ' - ' : '') + `in the link: ${key}=`;
+            const title = ` title="${tip.replace(/"/g, '&quot;')}"`;
+            html += type === 'bool'
+                ? `<label class="cb"${title}><input id="e-${key}" type="checkbox"> ${ed.label}</label>`
+                : `<label${title}>${ed.label} <input id="e-${key}" type="number" min="${min}" max="${max}" step="${ed.step || (type === 'int' ? 1 : 'any')}"></label>`;
+        }
+        html += '</div></details>';
+    }
+    html += `<details class="grp" data-group="World"${COLS !== DEFAULT_COLS || ROWS !== DEFAULT_ROWS || HALT ? ' open' : ''}><summary>World<span class="mark"></span></summary><div class="grid">
+        <label title="board width in squares">columns <input id="e-cols" type="number" min="20" max="2000" step="10" value="${COLS}"></label>
+        <label title="board height in squares">rows <input id="e-rows" type="number" min="20" max="2000" step="10" value="${ROWS}"></label>
+        <label class="cb" title="off: a dead world restarts from one organism (and the map keeps going)"><input id="e-halt" type="checkbox"${HALT ? ' checked' : ''}> pause when everything dies</label>
+        </div></details>`;
+    $id('fields').innerHTML = html;
+    $id('fields').addEventListener('input', markChanged);
+}
+
+// A dot on each group that differs from the default, and on each changed field.
+function markChanged() {
+    for (const det of document.querySelectorAll('#fields details.grp')) {
+        let any = false;
+        for (const el of det.querySelectorAll('input')) {
+            const key = el.id.slice(2);
+            let differs;
+            if (key === 'cols') differs = parseInt(el.value, 10) !== DEFAULT_COLS;
+            else if (key === 'rows') differs = parseInt(el.value, 10) !== DEFAULT_ROWS;
+            else if (key === 'halt') differs = el.checked;
+            else differs = (el.type === 'checkbox' ? el.checked : parseFloat(el.value)) !== DEFAULTS[key];
+            el.closest('label').classList.toggle('changed', differs);
+            any = any || differs;
+        }
+        det.querySelector('.mark').textContent = any ? ' •' : '';
+    }
+}
+
+function readEditor() {
+    const values = {};
+    for (const s of SETTING_LIST) {
+        if (isAlias(s)) continue;
+        const el = $id('e-' + s[0]);
+        if (!el) continue;
+        if (s[2] === 'bool') { values[s[0]] = el.checked; continue; }
+        const v = s[2] === 'int' ? parseInt(el.value, 10) : parseFloat(el.value);
+        if (Number.isFinite(v)) values[s[0]] = Math.min(s[4], Math.max(s[3], v));
+    }
+    return values;
 }
 
 // ---- the live world -------------------------------------------------------
@@ -290,6 +371,7 @@ function boot() {
     $id('grid').textContent = `${COLS}×${ROWS}`;
 
     // Settings line, presets from the sweeps, editor.
+    buildEditor();
     refreshSettingsUI();
     const preset = $id('preset');
     preset.addEventListener('change', () => {
@@ -302,19 +384,24 @@ function boot() {
         $id('edit').classList.toggle('on', !ed.hidden);
     });
     $id('apply').addEventListener('click', () => {
-        gotoSettings({
-            ...SETTINGS.values,
-            food: parseFloat($id('e-food').value),
-            drop: parseFloat($id('e-drop').value),
-            life: parseFloat($id('e-life').value),
-            movercost: parseInt($id('e-movercost').value, 10),
-            upkeep: parseFloat($id('e-upkeep').value),
-            lexp: parseFloat($id('e-lexp').value),
-            swallow: parseFloat($id('e-swallow').value),
-            gape: parseFloat($id('e-gape').value),
-            mcp: $id('e-mcp').checked,
-            kin: $id('e-kin').checked,
+        gotoSettings(readEditor(), {
+            cols: clampSize($id('e-cols').value, DEFAULT_COLS),
+            rows: clampSize($id('e-rows').value, DEFAULT_ROWS),
+            halt: $id('e-halt').checked,
         });
+    });
+    $id('reset-settings').addEventListener('click', () => {
+        for (const s of SETTING_LIST) {
+            if (isAlias(s)) continue;
+            const el = $id('e-' + s[0]);
+            if (!el) continue;
+            if (s[2] === 'bool') el.checked = !!DEFAULTS[s[0]];
+            else el.value = DEFAULTS[s[0]];
+        }
+        $id('e-cols').value = DEFAULT_COLS;
+        $id('e-rows').value = DEFAULT_ROWS;
+        $id('e-halt').checked = false;
+        markChanged();
     });
 
     // Copy a link to exactly this world.
@@ -387,6 +474,13 @@ function boot() {
         } else if (m.type === SimMsg.EXTINCT) {
             resets++;
             $id('s-resets').textContent = resets;
+        } else if (m.type === SimMsg.PAUSED) {
+            // "pause when everything dies"
+            halted = true;
+            running = false;
+            $id('run').textContent = 'run';
+            $id('run').classList.remove('alt');
+            toast('everything died - paused. Press run to start over from one organism.');
         } else if (m.type === SimMsg.ORGANISM) {
             if (m.token === 'select') {
                 if (!m.organism) { world.marker = null; world.draw(); toast('no organism there'); return; }
@@ -414,7 +508,7 @@ function boot() {
         seed: SEED,
         stats_mode: 'summary',
         want_phylo: true,
-        auto_pause: false,
+        auto_pause: HALT,
         params: jsonParams(),
     });
     worker.postMessage({ type: SimMsg.SNAPSHOT_HZ, hz: 6 });

@@ -266,10 +266,14 @@ The original game's controls, sorted by where they belong (conversation of
   a living member with its brain, or the founder's body if it's extinct), in
   the original organism format. Load organism, drop copies.
 
-Still to place: the remaining evolution controls in the settings editor
-(rotation, max organisms, mutation rates and types, eyes, one-touch kill, food
-blocks births), grid size, reset-or-pause on extinction. Left in `play.html`:
-the organism and brain editor, colour schemes, statistics charts.
+- **Every setting in the link and the settings panel**: all of the original
+  game's evolution controls plus ours (27 settings, `src/Sim/UrlSettings.js`),
+  grouped, built from that list, each with its link key in the tooltip; board
+  size and "pause when everything dies" too. `node tools/test-url-settings.js`
+  checks every one round-trips through a link.
+
+Left in `play.html`: the organism and brain editor, colour schemes,
+statistics charts.
 
 ### 4. Terrain and climate
 

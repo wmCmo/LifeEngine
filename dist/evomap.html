@@ -16,7 +16,7 @@
 
   .panel { position: fixed; background: rgba(9,17,23,0.86); border: 1px solid rgba(255,255,255,0.07);
     border-radius: 8px; padding: 12px 14px; backdrop-filter: blur(6px); }
-  #top { top: 14px; left: 14px; max-width: 330px; }
+  #top { top: 14px; left: 14px; max-width: 330px; z-index: 2; }   /* above the world preview when settings are open */
   h1 { margin: 0 0 2px; font-size: 13px; letter-spacing: .14em; color: #fff; font-weight: 700; }
   .sub { color: #6c7d93; margin-bottom: 10px; }
   .row { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; align-items: center; }
@@ -38,7 +38,14 @@
   #active { margin-top: 8px; color: #F2B84B; }
   #active.plain { color: #6c7d93; }
   #active .bad { color: #ff6b88; }
-  #editor { margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.07); }
+  #editor { margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.07);
+    max-height: calc(100vh - 230px); overflow-y: auto; padding-right: 4px; }
+  #editor details.grp { border-bottom: 1px solid rgba(255,255,255,0.05); padding: 4px 0 6px; }
+  #editor summary { cursor: pointer; color: #c9d4e6; font-weight: 600; padding: 2px 0; }
+  #editor summary .mark { color: #F2B84B; }
+  #editor details .grid { margin-top: 6px; }
+  #editor label.changed { color: #F2B84B; }
+  #editor .hint { margin-top: 6px; }
   #editor .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 10px; }
   #editor label { display: flex; flex-direction: column; color: #8a9bb2; gap: 2px; }
   #editor label.cb { flex-direction: row; align-items: center; gap: 6px; margin-top: 6px; }
@@ -118,19 +125,9 @@
   </div>
   <div id="active"></div>
   <div id="editor" hidden>
-    <div class="grid">
-      <label>food production <input id="e-food" type="number" min="0" max="100" step="1"></label>
-      <label>auto food drop <input id="e-drop" type="number" min="0" max="100" step="1"></label>
-      <label>lifespan × <input id="e-life" type="number" min="1" max="10000" step="10"></label>
-      <label>mover cost + <input id="e-movercost" type="number" min="0" max="1000" step="1"></label>
-      <label>upkeep (0 = off) <input id="e-upkeep" type="number" min="0" max="1" step="0.0005"></label>
-      <label>lifespan exponent <input id="e-lexp" type="number" min="0" max="2" step="0.25"></label>
-      <label title="share of a kill the killer swallows as food; 0 = off, the rest falls on the floor">swallow (0 = off) <input id="e-swallow" type="number" min="0" max="1" step="0.1"></label>
-      <label title="killers can only hurt prey up to this many times their own size; 0 = no limit">gape × (0 = off) <input id="e-gape" type="number" min="0" max="100" step="0.5"></label>
-    </div>
-    <label class="cb"><input id="e-mcp" type="checkbox"> movers can produce food</label>
-    <label class="cb"><input id="e-kin" type="checkbox"> don't kill own species</label>
-    <div class="row"><button id="apply">new world with these</button><span class="hint">same seed, so you can compare</span></div>
+    <div id="fields"></div>
+    <div class="row"><button id="apply">new world with these</button><button id="reset-settings" title="put every field back to its default (then press new world)">defaults</button></div>
+    <div class="hint">same seed, so you can compare &middot; hover a field for what it does</div>
   </div>
   <div id="legend"></div>
 </div>
@@ -193,8 +190,8 @@
   <b>space</b> run/pause &middot; <b>F</b> follow &middot; <b>Z</b> fit<br>
   hover a species for its history, click it to pick it<br>
   <b>W</b> live world: wheel zoom, middle-drag pan, tools 1&ndash;6<br><br>
-  Settings live in the link, e.g. <b>?seed=42&amp;food=7&amp;mcp=1&amp;drop=5</b>.
-  Also: life, movercost, kin, insta, block, mut, sym, look, species, upkeep, lexp, swallow, gape.
+  Settings live in the link, e.g. <b>?seed=42&amp;food=7&amp;mcp=1&amp;drop=5</b> &mdash;
+  every field in <b>settings</b> has one; hover it to see its key.
 </div>
 
 <div id="tooltip"></div>

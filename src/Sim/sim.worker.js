@@ -212,7 +212,10 @@ function runSlice() {
 
     last_slice_start = slice_start;
     let did = 0;
-    while (did < budget && (now() - slice_start) < SLICE_MS) {
+    // `running` too: extinction with auto-pause stops the world mid-slice,
+    // and an empty world would otherwise tick thousands of times before the
+    // slice ran out.
+    while (running && did < budget && (now() - slice_start) < SLICE_MS) {
         env.update();
         did++;
         tps_ticks++;
@@ -351,6 +354,9 @@ onmessage = function (e) {
                 if (msg.auto_pause) {
                     running = false;
                     postMessage({ type: SimMsg.PAUSED });
+                    // Show the empty world, not the last frame before it.
+                    sendSnapshot();
+                    sendStats();
                 } else {
                     env.reset_count++;
                     env.reset(false);

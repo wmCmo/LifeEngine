@@ -303,21 +303,43 @@ class Organism {
         return true;
     }
 
-    harm() {
+    // attacker: the organism whose killer cell did this, if any. With
+    // swallowing on, the blow that kills feeds the attacker.
+    harm(attacker) {
         this.damage++;
         if (this.damage >= this.maxHealth() || Hyperparams.instaKill) {
-            this.die();
+            this.die(Hyperparams.swallowShare > 0 ? attacker : null);
         }
     }
 
-    die() {
+    // Swallowing: can this organism's killer cells hurt `prey` at all? With
+    // gapeRatio > 0, only prey up to gapeRatio times its own size.
+    canSwallow(prey) {
+        const g = Hyperparams.gapeRatio;
+        return !(g > 0) || prey.anatomy.cells.length <= g * this.anatomy.cells.length;
+    }
+
+    // eater: an organism that swallows this one (Hyperparams.swallowShare).
+    // It gets that share of the body as food straight away; only the rest is
+    // left on the floor as food for anyone.
+    die(eater) {
         // Bookkeeping for experiments: how many die, and (payUpkeep) how
         // many of those starved.
         if (this.living && this.env) this.env.deaths = (this.env.deaths || 0) + 1;
+        const share = this.living && eater && eater.living ? Hyperparams.swallowShare : 0;
+        let swallowed = 0;
         for (var cell of this.anatomy.cells) {
             var real_c = this.c + cell.rotatedCol(this.rotation);
             var real_r = this.r + cell.rotatedRow(this.rotation);
-            this.env.changeCell(real_c, real_r, CellStates.food, null);
+            // share 0 draws no random number, so the world is unchanged
+            // when swallowing is off.
+            const eaten = share >= 1 || (share > 0 && Math.random() < share);
+            if (eaten) swallowed++;
+            this.env.changeCell(real_c, real_r, eaten ? CellStates.empty : CellStates.food, null);
+        }
+        if (swallowed) {
+            eater.food_collected += swallowed;
+            if (this.env) this.env.swallowed = (this.env.swallowed || 0) + swallowed;
         }
         this.species.decreasePop();
         this.living = false;

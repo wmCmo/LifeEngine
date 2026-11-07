@@ -8,3 +8,4 @@ dist/js/*.js
 runs/
 prof/
 .deploy/
+dist/js/*.LICENSE.txt

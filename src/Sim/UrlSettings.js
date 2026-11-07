@@ -27,9 +27,12 @@ const SETTINGS = [
     ['uexp',      'upkeepExponent',         'num',  0, 2,     v => `upkeep exponent ${v}`],
     ['starve',    'starveTicks',            'int',  1, 100000, v => `starve after ${v} ticks`],
     ['lexp',      'lifespanExponent',       'num',  0, 2,     v => `lifespan exponent ${v}`],
+    // Swallowing (off at 0). See Hyperparameters.js.
+    ['swallow',   'swallowShare',           'num',  0, 1,     v => v > 0 ? `swallow ${v}` : 'no swallowing'],
+    ['gape',      'gapeRatio',              'num',  0, 100,   v => v > 0 ? `gape ×${v}` : 'no gape limit'],
 ];
 
-// From the two sweeps (docs/sweeps). Labels say why each is interesting.
+// From the sweeps (docs/sweeps). Labels say why each is interesting.
 const PRESETS = [
     { id: 'default',   label: 'Default settings',                         query: {} },
     { id: 'species',   label: 'Most species at once (food 10)',          query: { food: 10 } },
@@ -38,6 +41,9 @@ const PRESETS = [
     { id: 'abundance', label: 'Abundance: every world converges (food 14)', query: { food: 14 } },
     { id: 'scarce',    label: 'Scarce: predators and eyes, risky (food 5, food drop 5)',
                                                                           query: { food: 5, drop: 5 } },
+    // Sweep 4: eat only what's no bigger than you, and eating feeds you.
+    { id: 'sizepays',  label: 'Size pays: swallow prey, gape limit (swallow 1, gape 1)',
+                                                                          query: { swallow: 1, gape: 1 } },
 ];
 
 function fieldsOf(s) { return Array.isArray(s[1]) ? s[1] : [s[1]]; }

@@ -55,6 +55,14 @@ const Hyperparams = {
         // lives longer, with steep diminishing returns.
         this.lifespanExponent = 1;
 
+        // Swallowing (both 0 = off, the original game). swallowShare: the
+        // share of a prey's body the killer gets as food when its blow kills;
+        // the rest falls on the floor as food for anyone, as in the original.
+        // gapeRatio: killer cells only hurt prey up to this many times the
+        // attacker's own size - small predators can't touch big bodies.
+        this.swallowShare = 0;
+        this.gapeRatio = 0;
+
         this.maxOrganisms = -1;
     },
 

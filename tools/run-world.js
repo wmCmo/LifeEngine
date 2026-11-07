@@ -26,9 +26,9 @@ const late_from = Math.floor(ticks / 2);
 // `vestigial` counts movers carrying a producer cell while movers can't
 // produce: a cell that does nothing but add body mass. Its prevalence is the
 // direct test of "cells are free, so useless organs survive".
-const late = { n: 0, orgs: 0, cells: 0, comp: {}, movers: 0, vestigial: 0 };
+const late = { n: 0, orgs: 0, cells: 0, comp: {}, movers: 0, vestigial: 0, max: 0, hunters: 0, hunter_cells: 0 };
 for (const b of BODY) late.comp[b] = 0;
-let deaths_at_half = 0, starved_at_half = 0;
+let deaths_at_half = 0, starved_at_half = 0, swallowed_at_half = 0;
 
 const t0 = Date.now();
 let done = 0;
@@ -39,6 +39,7 @@ for (let t = 1; t <= ticks; t++) {
     if (t === late_from) {
         deaths_at_half = env.deaths || 0;
         starved_at_half = env.starved || 0;
+        swallowed_at_half = env.swallowed || 0;
     }
     if (t >= late_from && t % 500 === 0) {
         const orgs = env.organisms;
@@ -49,11 +50,16 @@ for (let t = 1; t <= ticks; t++) {
             const a = orgs[i].anatomy;
             const cells = a.cells;
             late.cells += cells.length;
-            let hasProducer = false;
+            if (cells.length > late.max) late.max = cells.length;
+            let hasProducer = false, hasKiller = false;
             for (let j = 0; j < cells.length; j++) {
                 late.comp[cells[j].state.name]++;
                 if (cells[j].state.name === 'producer') hasProducer = true;
+                if (cells[j].state.name === 'killer') hasKiller = true;
             }
+            // Hunters: movers with a killer cell. Their size is the direct
+            // test of swallowing - does eating prey whole make predators big?
+            if (a.is_mover && hasKiller) { late.hunters++; late.hunter_cells += cells.length; }
             if (a.is_mover) {
                 late.movers++;
                 if (hasProducer && !movers_produce) late.vestigial++;
@@ -116,6 +122,11 @@ const out = {
     deaths_late: (env.deaths || 0) - deaths_at_half,
     starved_share_late: ((env.deaths || 0) - deaths_at_half) > 0
         ? +(((env.starved || 0) - starved_at_half) / ((env.deaths || 0) - deaths_at_half)).toFixed(3) : 0,
+    cells_max_late: late.max,
+    hunter_share_late: late.orgs ? +(late.hunters / late.orgs).toFixed(3) : 0,
+    hunter_cells_late: late.hunters ? +(late.hunter_cells / late.hunters).toFixed(2) : 0,
+    // Food swallowed by killers in the late half (0 with swallowing off).
+    swallowed_late: (env.swallowed || 0) - swallowed_at_half,
     trace: `${env.organisms.length} ${cells_end}`,
 };
 process.stdout.write(JSON.stringify(out) + '\n');

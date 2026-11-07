@@ -230,6 +230,25 @@ Also worth a free experiment: `moversCanProduce` is a hyperparameter set to
 `false`, which *enforces* the plant/animal split by fiat. Flip it and see
 whether the split re-emerges on its own.
 
+### 3b. Swallowing — built, and size pays
+
+Upkeep made size cost more; it never made size *pay*. In the original game a
+kill doesn't feed the killer (the prey turns into food on the floor for
+anyone), and nothing stops a 3-cell predator from killing a 30-cell body. Two
+switches, both off by default (off is verified to be the original game):
+`swallowShare` (the killing blow feeds the killer that share of the prey) and
+`gapeRatio` (killers only hurt prey up to that multiple of their own size).
+
+Results in [docs/sweeps/sweep-4.md](docs/sweeps/sweep-4.md): gape 1 roughly
+triples hunter size (4 → 11–14 cells, in every seed) and doubles the biggest
+bodies; swallowing on top makes those big hunters common (predators 16% →
+24–28%). Swallowing alone mostly feeds armed plants. Gape 2 is too loose to
+matter. Preset: "Size pays" (`swallow=1&gape=1`).
+
+Next: long runs on that preset, and only then connective tissue (organisms
+fusing into a bigger one). Without a reason to be big, fusion would only make a
+bigger target.
+
 ### 4. Terrain and climate
 
 `src/Utils/Perlin.js` is sitting there unused, which is a strong hint about

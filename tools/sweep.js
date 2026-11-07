@@ -81,6 +81,12 @@ const PLANS = {
         ['upkeepScale',      'upkeep', [0, 0.0005, 0.001, 0.002, 0.005]],
         ['lifespanExponent', 'lexp',   [1, 0.25]],
     ],
+    // Swallowing: does eating prey whole, and only prey your own size or
+    // smaller, make size pay? Share 0 with gape 0 is the original game.
+    swallow: [
+        ['swallowShare', 'swallow', [0, 0.5, 1]],
+        ['gapeRatio',    'gape',    [0, 1, 2]],
+    ],
 };
 
 let configs;
@@ -228,6 +234,9 @@ function summarise() {
             mass_extinctions: avg(ok.map(r => r.mass_extinctions)),
             vestigial: avg(ok.map(r => r.vestigial_share || 0)),
             starved: avg(ok.map(r => r.starved_share_late || 0)),
+            hunters: avg(ok.map(r => r.hunter_share_late || 0)),
+            hunter_cells: avg(ok.map(r => r.hunter_cells_late || 0)),
+            cells_max: avg(ok.map(r => r.cells_max_late || 0)),
             tps: avg(ok.map(r => r.tps)),
         };
     }
@@ -299,6 +308,9 @@ function summarise() {
             ['predators %', s => `${Math.round(s.guild.predator * 100)}`],
             ['plants (incl. armed) %', s => `${Math.round((s.guild.plant + s.guild.armed_plant) * 100)}`],
             ['eyes %', s => `${Math.round(s.eye * 100)}`],
+            ['hunters (movers with a killer) %', s => `${Math.round(s.hunters * 100)}`],
+            ['hunter body size (cells)', s => s.hunter_cells.toFixed(1)],
+            ['largest body (cells)', s => s.cells_max.toFixed(1)],
             ['distinct ruling body plans', s => s.ruler_plans.toFixed(1)],
             ['seeds disagree', s => s.divergence.toFixed(2)],
             ['movers carrying a useless producer cell %', s => `${Math.round(s.vestigial * 100)}`],

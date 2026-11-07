@@ -7,6 +7,7 @@ module.exports = {
         workerbench: './src/worker-bench.js',
         multiworld: './src/multiworld.js',
         evomap: './src/evomap.js',
+        hero: './src/hero.js',
     },
     output: {
         filename: '[name].js',

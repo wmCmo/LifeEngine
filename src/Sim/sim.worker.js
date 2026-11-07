@@ -36,6 +36,7 @@ let last_snapshot = 0;
 let last_stats = 0;
 let accum_ms = 0;
 let last_slice_end = 0;
+let last_slice_start = 0;   // 0 == no slice yet since (re)starting
 
 let tps = 0;
 let tps_ticks = 0;
@@ -70,6 +71,18 @@ const fakeEngine = {
 
 const yield_chan = new MessageChannel();
 yield_chan.port1.onmessage = () => { scheduled = false; runSlice(); };
+
+// With a speed limit, a slice that found no tick due must sleep until the
+// next one is - re-posting straight away spins a whole core waiting (a
+// 15-tick/s page measured 120% of a core). Unlimited speed has no waiting,
+// so it keeps the unclamped MessageChannel yield.
+function scheduleSliceAfter(ms) {
+    if (scheduled || !running) return;
+    if (!(ms > 1)) { scheduleSlice(); return; }
+    scheduled = true;
+    setTimeout(() => { scheduled = false; runSlice(); }, ms);
+}
+
 function scheduleSlice() {
     if (scheduled || !running) return;
     scheduled = true;
@@ -188,11 +201,16 @@ function runSlice() {
     let budget = Infinity;
     if (target_fps > 0) {
         const step_ms = 1000 / target_fps;
-        accum_ms += (last_slice_end === 0 ? step_ms : slice_start - last_slice_end);
+        // Wall time since the previous slice STARTED, so the time spent
+        // ticking counts too. Measuring from its end only counted the gaps
+        // between slices, and a cap near the machine's real speed ran at
+        // about half (2000 tps gave ~1000 where unlimited gave ~2500).
+        accum_ms += (last_slice_start === 0 ? step_ms : slice_start - last_slice_start);
         budget = Math.floor(accum_ms / step_ms);
         if (budget < 0) budget = 0;
     }
 
+    last_slice_start = slice_start;
     let did = 0;
     while (did < budget && (now() - slice_start) < SLICE_MS) {
         env.update();
@@ -215,7 +233,14 @@ function runSlice() {
     if (last_slice_end - last_snapshot >= 1000 / snapshot_hz) sendSnapshot();
     if (last_slice_end - last_stats >= 1000) sendStats();
 
-    scheduleSlice();
+    if (target_fps > 0) {
+        // Time until the next tick is owed. Snapshots and stats ride along
+        // with ticks, so nothing else needs waking up for.
+        const step_ms = 1000 / target_fps;
+        scheduleSliceAfter(step_ms - accum_ms);
+    } else {
+        scheduleSlice();
+    }
 }
 
 // ------------------------------------------------------------------ helpers
@@ -344,6 +369,7 @@ onmessage = function (e) {
             if (!running) {
                 running = true;
                 last_slice_end = 0;
+                last_slice_start = 0;
                 accum_ms = 0;
                 tps_since = now();
                 tps_ticks = 0;
@@ -368,6 +394,7 @@ onmessage = function (e) {
             target_fps = msg.fps;
             accum_ms = 0;
             last_slice_end = 0;
+            last_slice_start = 0;
             break;
 
         case SimMsg.SET_PARAMS:
@@ -470,7 +497,7 @@ onmessage = function (e) {
             } catch (err) {
                 postMessage({ type: SimMsg.LOAD_FAILED, error: String(err && err.message || err) });
             }
-            if (was_running) { running = true; last_slice_end = 0; scheduleSlice(); }
+            if (was_running) { running = true; last_slice_end = 0; last_slice_start = 0; scheduleSlice(); }
             break;
         }
 

@@ -42,9 +42,41 @@
   @media (max-width: 640px) { nav .links .hide-sm { display: none; } }
 
   /* hero */
-  .hero { padding: 72px 0 56px; background:
-            radial-gradient(1200px 500px at 85% -10%, rgba(92,200,255,0.10), transparent 60%),
-            radial-gradient(900px 500px at -10% 110%, rgba(63,224,122,0.08), transparent 60%); }
+  /* The hero is a live world (src/hero.js) under a veil that's dark in the
+     middle, where the text is, and clear at the edges, where the life is. */
+  .hero { position: relative; min-height: calc(100svh - 54px); display: grid; place-items: center;
+          overflow: hidden; padding: 72px 0 96px; background: #0E1318; }
+  #hero-world { position: absolute; inset: 0; width: 100%; height: 100%; display: block;
+                opacity: 0; transition: opacity 1.4s ease; }
+  #hero-world.on { opacity: 1; }
+  .veil { position: absolute; inset: 0; pointer-events: none;
+          background:
+            radial-gradient(ellipse 58% 52% at 50% 48%, rgba(11,20,27,0.94) 0%, rgba(11,20,27,0.86) 42%,
+                            rgba(11,20,27,0.35) 78%, rgba(11,20,27,0.12) 100%),
+            linear-gradient(to bottom, rgba(11,20,27,0) 78%, var(--bg) 100%); }
+  /* On a phone the text runs almost edge to edge: widen the dark middle. */
+  @media (max-width: 640px) {
+    .veil { background:
+      radial-gradient(ellipse 100% 58% at 50% 48%, rgba(11,20,27,0.95) 0%, rgba(11,20,27,0.88) 60%,
+                      rgba(11,20,27,0.45) 88%, rgba(11,20,27,0.2) 100%),
+      linear-gradient(to bottom, rgba(11,20,27,0) 78%, var(--bg) 100%); }
+  }
+  .hero-inner { position: relative; text-align: center; max-width: 780px; padding: 0 20px;
+                text-shadow: 0 2px 24px rgba(0,0,0,0.65); }
+  .hero h1 { font-size: clamp(42px, 7.2vw, 88px); margin: 16px 0 20px; }
+  .hero .lede { margin: 0 auto; font-size: clamp(17px, 2vw, 20px); }
+  .hero .cta { justify-content: center; margin-top: 34px; text-shadow: none; }
+  .live { position: absolute; left: 50%; bottom: 22px; transform: translateX(-50%); white-space: nowrap;
+          font-family: var(--mono); font-size: 12px; color: var(--muted); background: rgba(11,20,27,0.7);
+          border: 1px solid var(--line); border-radius: 999px; padding: 6px 12px; }
+  .live:hover { color: var(--white); text-decoration: none; border-color: #3a5470; }
+  .live .dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--plant);
+               margin-right: 8px; vertical-align: 1px; animation: pulse 2s ease-in-out infinite; }
+  @keyframes pulse { 50% { opacity: 0.25; } }
+  @media (prefers-reduced-motion: reduce) { .live .dot { animation: none; } #hero-world { transition: none; } }
+  @media (max-width: 560px) { .live { font-size: 11px; } .live .long { display: none; } }
+  #intro { border-top: 0; padding-top: 40px; }
+  #intro .lede { max-width: 760px; }
   .kicker { font-family: var(--mono); font-size: 12px; letter-spacing: .16em; text-transform: uppercase; color: var(--armed); }
   h1 { font-size: clamp(36px, 6vw, 64px); line-height: 1.05; margin: 14px 0 18px; color: var(--white); letter-spacing: -0.02em; }
   .lede { font-size: 19px; color: var(--text); max-width: 680px; margin: 0; }
@@ -131,9 +163,29 @@
 </nav>
 
 <header class="hero">
-  <div class="wrap">
+  <canvas id="hero-world" aria-hidden="true"></canvas>
+  <div class="veil"></div>
+  <div class="hero-inner">
     <div class="kicker">Experiments on The Life Engine</div>
     <h1>Is evolution<br>going in circles?</h1>
+    <p class="lede">
+      Bodies made of cells, evolving on a grid. Run it long enough and the same two shapes always
+      win. We built the tools to find out <b>whether that's forced by the rules</b> &mdash; or just
+      one history out of many.
+    </p>
+    <div class="cta">
+      <a class="btn primary" href="evomap.html?seed=625341585">Open the evolution map →</a>
+      <a class="btn" href="multiworld.html">Watch 12 worlds at once</a>
+      <a class="btn" href="play.html">Play the original game</a>
+    </div>
+  </div>
+  <a class="live" href="evomap.html?swallow=1&amp;gape=1" title="this is a real simulation, not a video - open one like it">
+    <span class="dot"></span>live<span class="long"> &middot; a real world is evolving behind this page</span> &middot; tick <span id="hero-tick">&hellip;</span>
+  </a>
+</header>
+
+<section id="intro">
+  <div class="wrap">
     <p class="lede">
       Run <a href="https://thelifeengine.net">The Life Engine</a> long enough and the same two shapes
       take over: <b>armed plants</b> — producers packed in a checkerboard, killers on the outside —
@@ -141,11 +193,6 @@
       forced by the rules, or just one history out of many. So we made the simulation fast enough
       to run hundreds of worlds, taught it what a species is, and drew its family tree as it grows.
     </p>
-    <div class="cta">
-      <a class="btn primary" href="evomap.html?seed=625341585">Open the evolution map →</a>
-      <a class="btn" href="multiworld.html">Watch 12 worlds at once</a>
-      <a class="btn" href="play.html">Play the original game</a>
-    </div>
 
     <div class="specimens">
       <div class="spec">
@@ -174,7 +221,7 @@
       </div>
     </div>
   </div>
-</header>
+</section>
 
 <section id="built">
   <div class="wrap">
@@ -396,6 +443,7 @@
   </div>
 </footer>
 
+<script src="js/hero.js"></script>
 <script>
   // Real anatomies: the origin organism (WorldEnvironment.OriginOfLife) and two
   // organisms exported from a long run. [col, row, cell].

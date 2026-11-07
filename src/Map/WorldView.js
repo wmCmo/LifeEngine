@@ -6,6 +6,7 @@
 // page, which asks the worker.
 
 const SnapshotRenderer = require('../Sim/SnapshotRenderer');
+const { drawEyeSlits } = SnapshotRenderer;
 
 const TOOLS = ['move', 'food', 'wall', 'kill', 'select', 'drop'];
 
@@ -51,6 +52,7 @@ class WorldView {
         this.cols = cols;
         this.rows = rows;
         this.snap.draw(states, null, cols, rows);
+        this.states = states;
         if (this.visible) {
             if (!this.fitted) this.fit();
             this.draw();
@@ -93,6 +95,13 @@ class WorldView {
         if (!this.cols) return;
         g.imageSmoothingEnabled = false;
         g.drawImage(this.off, (0 - this.cam.x) * s, (0 - this.cam.y) * s, this.cols * s, this.rows * s);
+
+        // Eye slits, for the squares on screen, once they're big enough.
+        if (this.states) {
+            const c0 = Math.max(0, Math.floor(this.cam.x)), c1 = Math.min(this.cols, Math.ceil(this.cam.x + this.W / s));
+            const r0 = Math.max(0, Math.floor(this.cam.y)), r1 = Math.min(this.rows, Math.ceil(this.cam.y + this.H / s));
+            drawEyeSlits(g, this.states, this.cols, c0, c1, r0, r1, -this.cam.x * s, -this.cam.y * s, s);
+        }
 
         // Board edge.
         g.strokeStyle = 'rgba(255,255,255,0.12)';

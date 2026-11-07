@@ -314,7 +314,12 @@ class WorldEnvironment extends Environment{
         for (let name in species)
             FossilRecord.addSpeciesObj(species[name]);
         FossilRecord.loadRaw(env.fossil_record);
+        // Plain fields come from the file, but whether this world has a page
+        // is a fact about where it runs: a file saved headless (or not) must
+        // not flip it, or a worker reaches for jQuery.
+        const headless = this.headless;
         SerializeHelper.overwriteNonObjects(env, this);
+        this.headless = headless;
         // In the worker there is no checkbox to read; the main thread decides
         // and sends the controls separately.
         if (!this.headless && $('#override-controls').is(':checked'))

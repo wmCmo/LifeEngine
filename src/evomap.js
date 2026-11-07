@@ -16,6 +16,7 @@ const NEON = {
     producer: '#15DE59', mover: '#60D4FF', killer: '#F82380', armor: '#7230DB', eye: '#B6C1EA',
 };
 for (const s of CellStates.all) s.color = NEON[s.name] || 'black';
+CellStates.eye.slit_color = '#0E1318';
 
 const params = new URLSearchParams(location.search);
 const COLS = parseInt(params.get('cols') || '300');

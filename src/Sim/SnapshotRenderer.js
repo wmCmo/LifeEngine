@@ -23,6 +23,36 @@ function hexToABGR(color) {
     return (255 << 24) | (b << 16) | (g << 8) | r;   // little-endian RGBA
 }
 
+const EYE = CellStates.eye.index;
+
+// Below this many pixels per square a slit is noise, so eyes stay flat.
+const SLIT_MIN_PX = 4;
+
+// The original game draws an eye as a pale square with a dark slit along the
+// way it faces (CellStates Eye.render). The slit runs from the facing edge
+// to a quarter past the centre, a quarter of the square wide. Here as four
+// axis-aligned rects instead of a rotate per eye. The facing direction comes
+// from the snapshot byte's high nibble (GridMap.refreshView).
+function drawEyeSlits(ctx, states, cols, c0, c1, r0, r1, ox, oy, s) {
+    if (s < SLIT_MIN_PX) return;
+    ctx.fillStyle = CellStates.eye.slit_color || 'black';
+    const w = s / 4, h = s * 3 / 4, e = s / 8;
+    for (let r = r0; r < r1; r++) {
+        const row = r * cols;
+        for (let c = c0; c < c1; c++) {
+            const v = states[row + c];
+            if ((v & 0x0F) !== EYE) continue;
+            const cx = ox + c * s + s / 2, cy = oy + r * s + s / 2;
+            switch ((v >> 4) & 3) {
+                case 0: ctx.fillRect(cx - e, cy - s / 2, w, h); break;      // facing up
+                case 1: ctx.fillRect(cx - s / 4, cy - e, h, w); break;      // right
+                case 2: ctx.fillRect(cx - e, cy - s / 4, w, h); break;      // down
+                case 3: ctx.fillRect(cx - s / 2, cy - e, h, w); break;      // left
+            }
+        }
+    }
+}
+
 class SnapshotRenderer {
     constructor(canvas, container_id) {
         this.canvas = canvas;
@@ -106,6 +136,7 @@ class SnapshotRenderer {
         const ch = this.canvas.height;
         this.ctx.imageSmoothingEnabled = false;
         this.ctx.drawImage(this.scratch, 0, 0, cols, rows, 0, 0, cw, ch);
+        drawEyeSlits(this.ctx, states, cols, 0, cols, 0, rows, 0, 0, Math.min(cw / cols, ch / rows));
 
         if (hits.length || this.highlight_cell) {
             const sx = cw / cols;
@@ -149,3 +180,4 @@ class SnapshotRenderer {
 }
 
 module.exports = SnapshotRenderer;
+module.exports.drawEyeSlits = drawEyeSlits;
